@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Sources{% endblock %}
+{% from "_macros.html" import avatar, icon %}
+{% block content %}
+<div class="page-head"><h1>Sources</h1></div>
+<form class="add" method="post" action="{{ url_for('sources.add') }}">
+  <input name="url" type="url" placeholder="Paste a news feed link, like https://example.com/feed" required autofocus aria-label="News feed link">
+  {% if groups %}<select name="group_id" aria-label="Group">{% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}</select>{% endif %}
+  <button type="submit"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add source</button>
+</form>
+<div class="group-tools">
+  <form class="new-group" method="post" action="{{ url_for('sources.add_group') }}">
+    <input name="name" required maxlength="40" placeholder="New group name" aria-label="New group name">
+    <button class="ghost" type="submit">{{ icon('plus') }}Create group</button>
+  </form>
+</div>
+
+{% for group in groups %}
+<details class="card group" data-group="{{ group.id }}">
+  <summary class="group-head">
+    <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+    <b>{{ group.name }}</b>
+    <span>{{ group.sources | length }} {{ 'source' if group.sources | length == 1 else 'sources' }}</span>
+  </summary>
+  <details class="group-edit-box">
+    <summary><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>Edit name and AI relevance</summary>
+    <form class="group-edit" method="post" action="{{ url_for('sources.update_group', group_id=group.id) }}">
+      <label>Name<input name="name" required maxlength="40" value="{{ group.name }}"></label>
+      <label>AI relevance: which news from this group belongs in your Newsroom<textarea name="relevance" rows="3">{{ group.relevance or relevance_default }}</textarea></label>
+      <div class="panel-foot">
+        <button class="danger-button" type="submit" formaction="{{ url_for('sources.delete_group', group_id=group.id) }}" onclick="return confirm('Delete {{ group.name }} with its {{ group.sources | length }} sources and all their news?')">Delete group</button>
+        <button class="save" type="submit">Save</button>
+      </div>
+    </form>
+  </details>
+  {% if group.sources %}
+  <ul class="source-list">
+    {% for source in group.sources %}
+    <li class="source {{ 'paused' if not source.enabled }}">
+      {{ avatar(source.id, source.name) }}
+      <div class="info">
+        <p class="name">{{ source.name }} <span class="dot {{ source.status }}" title="{{ source.last_error or (source.status | source_label) }}"></span></p>
+        <p class="meta"><span class="url">{{ source.url }}</span><span class="when" title="Last checked">{{ icon('clock') }}{{ source.last_checked_at | ago }}</span></p>
+      </div>
+      {% if source.status == 'error' %}
+      <form method="post" action="{{ url_for('sources.retry', source_id=source.id) }}">
+        <button class="chip-button" type="submit" title="Check this source again now"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>Retry</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('sources.toggle', source_id=source.id) }}">
+        <button class="icon" type="submit" title="{{ 'Pause' if source.enabled else 'Resume' }}" aria-label="{{ 'Pause' if source.enabled else 'Resume' }}">
+          {% if source.enabled %}<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>{% else %}<svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg>{% endif %}
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('sources.delete', source_id=source.id) }}" onsubmit="return confirm('Delete {{ source.name }} and all its news?')">
+        <button class="icon danger" type="submit" title="Delete" aria-label="Delete">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        </button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="group-empty">No sources in this group yet.</p>
+  {% endif %}
+</details>
+{% else %}
+<div class="empty"><p>No sources yet</p><span>Paste a news feed link above to start.</span></div>
+{% endfor %}
+<script src="{{ url_for('static', filename='groups.js') }}" defer></script>
+{% endblock %}

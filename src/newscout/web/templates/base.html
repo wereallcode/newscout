@@ -1,0 +1,47 @@
+{% from "_macros.html" import switch %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} - Newscout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-inner">
+      <a class="brand" href="{{ url_for('dashboard.index') }}">
+        <span class="logo"><svg viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/></svg></span>
+        Newscout
+      </a>
+      <div class="control-bar" id="control-bar" data-live aria-label="Quick start and pause">
+        {% set fetching = states.fetcher == 'running' %}
+        {{ switch('control.stop_fetcher' if fetching else 'control.start_fetcher', 'Fetcher', fetching, states.fetcher | replace(' ', '-')) }}
+        {% if states.ai == 'off' %}<a class="switch off" href="{{ url_for('control.index') }}" title="Add a DeepSeek key to start the AI"><span class="dot"></span>AI<span class="act"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>
+        {% else %}{{ switch('control.start_ai' if states.ai == 'paused' else 'control.stop_ai', 'AI', states.ai != 'paused', states.ai) }}{% endif %}
+      </div>
+      <nav>
+        <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if request.endpoint == 'dashboard.index' }}">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('control.index') }}" class="{{ 'active' if request.endpoint == 'control.index' }}">
+          <svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span>Control Room</span>
+        </a>
+        <a href="{{ url_for('sources.index') }}" class="{{ 'active' if request.endpoint == 'sources.index' }}">
+          <svg viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg><span>Sources</span>
+        </a>
+        <a href="{{ url_for('settings.index') }}" class="{{ 'active' if request.endpoint == 'settings.index' }}">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span></a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<p class="flash {{ category }}">{{ message }}</p>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

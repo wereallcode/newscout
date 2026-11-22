@@ -1,0 +1,102 @@
+{% macro icon(name) %}
+<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">{{ {
+  'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  'plus': '<path d="M12 5v14M5 12h14"/>',
+  'refresh': '<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>',
+  'pencil': '<path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/>',
+  'trash': '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  'merge': '<path d="M8 6l4-3 4 3M12 3v12M6 21h12M6 13l6 4 6-4"/>',
+  'hourglass': '<path d="M7 3h10M7 21h10M8 3v3l4 6-4 6v3M16 3v3l-4 6 4 6v3"/>',
+  'check': '<path d="M5 12l4 4 10-10"/>',
+  'news': '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+  'ban': '<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/>',
+  'globe': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+}[name] | safe }}</svg>
+{%- endmacro %}
+
+{% macro avatar(source_id, name) %}
+<span class="avatar" style="--hue: {{ source_id | hue }}">{{ name[:1] | upper }}</span>
+{% endmacro %}
+
+{% macro story_link(story, class) %}
+{% if story.link %}<a class="{{ class }}" href="{{ story.link }}" target="_blank" rel="noopener noreferrer">{{ story.title }}</a>{% else %}<span class="{{ class }}">{{ story.title }}</span>{% endif %}
+{% endmacro %}
+
+{% macro raw_list(stories) %}
+<ul class="stories">
+  {% for story in stories %}
+  <li class="story raw {{ story.status }}">
+    <div class="story-side">{{ avatar(story.source_id, story.source_name) }}</div>
+    <div class="story-body">
+      {{ story_link(story, 'title') }}
+      <p class="meta"><span>{{ story.source_name }}</span><span class="when">{{ icon('clock') }}{{ story.sort_at | ago }}</span></p>
+    </div>
+    {% if story.status == 'waiting' %}
+    <span class="raw-status waiting" title="{{ 'Relevant, waiting for the AI to write it' if story.relevant else 'Waiting for the AI' }}">{% if story.relevant %}{{ icon('check') }}Relevant{% else %}{{ icon('hourglass') }}Waiting{% endif %}</span>
+    {% elif story.status == 'kept' %}
+    <span class="raw-status kept" title="News #{{ story.event_id }}">{{ icon('news') }}#{{ story.event_id }}</span>
+    {% elif story.status == 'merged' %}
+    <span class="raw-status merged" title="Merged into news #{{ story.event_id }}">{{ icon('merge') }}#{{ story.event_id }}</span>
+    {% elif story.status == 'dropped' %}
+    <span class="raw-status dropped" title="Dropped by the AI: {{ story.reason }}">{{ icon('ban') }}<span class="reason">{{ story.reason }}</span></span>
+    {% else %}
+    <span class="raw-status trash" title="Trash{{ ': ' ~ story.reason if story.reason }}">{{ icon('trash') }}<span class="reason">{{ story.reason or 'Trash' }}</span></span>
+    {% endif %}
+    {% if story.status == 'waiting' %}
+    <form class="story-actions" method="post" action="{{ url_for('dashboard.trash_story', story_id=story.id) }}">
+      <button class="chip-button icon-chip" type="submit" title="Move to trash" aria-label="Move to trash"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+    </form>
+    {% elif story.status in ('trash', 'dropped') %}
+    <form class="story-actions" method="post" action="{{ url_for('dashboard.restore_story', story_id=story.id) }}">
+      <button class="chip-button" type="submit" title="Send back to the AI"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>Restore</button>
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{% macro event_list(events, new_since=none) %}
+<ul class="stories">
+  {% for event in events %}
+  {% set lead = event.sources[0] %}
+  <li class="story{{ ' merged' if event.merged }}">
+    <div class="story-side">
+      {% if event.merged %}
+      <span class="avatar merged-avatar" title="{{ event.sources | length }} sources"><svg viewBox="0 0 24 24"><path d="M8 6l4-3 4 3M12 3v12M6 21h12M6 13l6 4 6-4"/></svg></span>
+      {% else %}
+      {{ avatar(lead.source_id, lead.source_name) }}
+      {% endif %}
+      <span class="rank">#{{ event.id }}</span>
+    </div>
+    <div class="story-body">
+      {% if new_since and event.sort_at >= new_since %}<span class="new-tag">New</span>{% endif %}
+      <span class="title">{{ event.title }}</span>
+      {% if event.summary %}<p class="summary">{{ event.summary }}</p>{% endif %}
+      <p class="meta sources">
+        {% if event.merged %}<span class="merged-badge" title="Merged from {{ event.sources | length }} sources">{{ icon('merge') }}{{ event.sources | length }} sources</span>{% endif %}
+        {% for story in event.sources %}
+        {% if story.link %}<a class="source-link" href="{{ story.link }}" target="_blank" rel="noopener noreferrer" title="Original: {{ story.title }}">{{ avatar(story.source_id, story.source_name) }}{{ story.source_name }}<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+        {% else %}<span class="source-link" title="Original: {{ story.title }}">{{ avatar(story.source_id, story.source_name) }}{{ story.source_name }}</span>{% endif %}
+        {% endfor %}
+        <span class="meta-time">{{ icon('clock') }}{{ event.sort_at | ago }}</span>
+      </p>
+    </div>
+    <form class="story-actions" method="post" action="{{ url_for('dashboard.trash_event', event_id=event.id) }}">
+      <button class="chip-button icon-chip" type="submit" title="Move to trash" aria-label="Move to trash"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+{% macro stage_icon(name) %}
+{% if name == 'raw' %}<svg viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+{% else %}<svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6M9 11h.01M15 11h.01"/></svg>{% endif %}
+{% endmacro %}
+
+{% macro switch(endpoint, name, running, state) %}
+<form method="post" action="{{ url_for(endpoint) }}">
+  <button class="switch {{ state }}" type="submit" title="{{ ('Pause the ' if running else 'Start the ') ~ name }}"><span class="dot"></span>{{ name }}<span class="act">{% if running %}<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>{% else %}<svg class="play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>{% endif %}</span></button>
+</form>
+{% endmacro %}

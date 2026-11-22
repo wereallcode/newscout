@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Settings</h1></div>
+<form class="card settings" method="post" action="{{ url_for('settings.save') }}">
+  <label class="setting">
+    <span><b>Mark as new</b><small>News younger than this gets a <span class="new-tag">New</span> tag.</small></span>
+    <span class="field"><input name="new_minutes" inputmode="numeric" value="{{ values.new_minutes }}">min</span>
+  </label>
+  <label class="setting">
+    <span><b>Empty trash after</b><small>Trashed news is deleted for good.</small></span>
+    <span class="field"><input name="trash_days" inputmode="numeric" value="{{ values.trash_days }}">days</span>
+  </label>
+  <label class="setting">
+    <span><b>Keep news for</b><small>Older news is removed to keep the database small.</small></span>
+    <span class="field"><input name="news_days" inputmode="numeric" value="{{ values.news_days }}">days</span>
+  </label>
+  <div class="settings-foot"><button class="save" type="submit">Save</button></div>
+</form>
+
+{% endblock %}

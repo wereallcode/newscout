@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>Fixture Feed</title>
+  <link>https://example.com</link>
+  <item>
+    <title>First story</title>
+    <link>https://example.com/1</link>
+    <guid>story-1</guid>
+    <pubDate>Fri, 20 Nov 2026 10:00:00 GMT</pubDate>
+    <description><![CDATA[<p>Tom &amp; Jerry <script>alert(1)</script>are back.</p>]]></description>
+  </item>
+  <item>
+    <title>Second story</title>
+    <link>https://example.com/2</link>
+    <description>word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word </description>
+  </item>
+  <item>
+    <title>No link story</title>
+  </item>
+</channel>
+</rss>

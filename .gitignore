@@ -1,0 +1,9 @@
+# folders
+__pycache__
+.venv
+.pytest_cache
+.ruff_cache
+data
+
+# files
+.DS_Store

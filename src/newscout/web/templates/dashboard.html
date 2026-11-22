@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% from "_macros.html" import event_list, raw_list, stage_icon %}
+{% block content %}
+{% if not has_sources %}
+<section class="card onboarding">
+  <h2>Welcome to Newscout</h2>
+  <ol>
+    <li><a href="{{ url_for('sources.index') }}">Add a news source</a><span>Paste the feed link of a site you follow.</span></li>
+    <li><a href="{{ url_for('control.index') }}">Start the fetcher</a><span>News arrives here and keeps coming.</span></li>
+    <li><a href="{{ url_for('control.index') }}">Add a DeepSeek key</a><span>Optional: the same news from several sources becomes one.</span></li>
+  </ol>
+</section>
+{% endif %}
+
+<div class="tabs-row" id="flow" data-live>
+  <a class="flow-step {{ 'on' if step == 'raw' }}" href="{{ url_for('dashboard.index', step='raw') }}">
+    <span class="flow-icon raw">{{ stage_icon('raw') }}</span>
+    <span class="flow-text"><h3>Raw <span class="n">(<span data-count="raw">{{ counts.waiting }}</span>)</span></h3></span>
+  </a>
+  <span class="ai-arrow" title="The AI turns raw news into news"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>AI{% if counts.waiting %}<small>{{ counts.waiting }} waiting</small>{% endif %}</span>
+  <a class="flow-step {{ 'on' if step == 'newsroom' }}" href="{{ url_for('dashboard.index') }}">
+    <span class="flow-icon newsroom">{{ stage_icon('newsroom') }}</span>
+    <span class="flow-text"><h3>Newsroom <span class="n">(<span data-count="newsroom">{{ news_count }}</span>)</span></h3></span>
+  </a>
+</div>
+
+{% if step == 'raw' %}
+<details class="card panel">
+  <summary><svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI Instructions<span>How the AI merges and writes news</span></summary>
+  <form method="post" action="{{ url_for('dashboard.save_instructions') }}">
+    <p class="instruction-note">Each raw story is first checked against its group's relevance instruction, set on the <a href="{{ url_for('sources.index') }}">Sources</a> page, and relevant stories then go through these steps.</p>
+    {% for item in steps %}
+    <label class="instruction">
+      <span class="instruction-head"><b>{{ loop.index + 1 }}. {{ item.title }}</b>{{ item.hint }}</span>
+      <textarea name="{{ item.key }}" rows="4">{{ texts[item.key] }}</textarea>
+    </label>
+    {% endfor %}
+    <div class="panel-foot">
+      <button class="ghost" type="submit" name="reset" value="1">Reset to defaults</button>
+      <button class="save" type="submit">Save</button>
+    </div>
+  </form>
+</details>
+<div class="filters" role="tablist" aria-label="Show">
+  {% for key, (label, _) in filters.items() %}
+  <a class="chip-option {{ 'on' if key == show }}" role="tab" href="{{ url_for('dashboard.index', step='raw', show=None if key == 'all' else key) }}">{{ label }}<span>{{ counts[key] }}</span></a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<section class="queue" id="news">
+  <a id="fresh" class="fresh" href="{{ url_for('dashboard.index', step=None if step == 'newsroom' else step) }}" data-tab="{{ step }}" hidden>
+    <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span id="fresh-text">New news arrived.</span><b>Show</b>
+  </a>
+  {% if items %}
+  <div class="card">{% if step == 'newsroom' %}{{ event_list(items, new_since) }}{% else %}{{ raw_list(items) }}{% endif %}</div>
+  {% if pages > 1 %}
+  {% set tab = None if step == 'newsroom' else step %}
+  {% set filter = None if step == 'newsroom' or show == 'all' else show %}
+  <div class="pager" role="navigation" aria-label="Pages">
+    {% if page > 1 %}<a href="{{ url_for('dashboard.index', step=tab, show=filter, page=None if page == 2 else page - 1, _anchor='news') }}"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Previous</a>{% else %}<span aria-disabled="true"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>Previous</span>{% endif %}
+    <span class="pager-info">Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a href="{{ url_for('dashboard.index', step=tab, show=filter, page=page + 1, _anchor='news') }}">Next<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>{% else %}<span aria-disabled="true">Next<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="card empty">
+    <svg viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+    <p>{{ tabs[step].empty }}</p>
+  </div>
+  {% endif %}
+</section>
+<script src="{{ url_for('static', filename='live.js') }}" defer></script>
+<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+{% endblock %}
