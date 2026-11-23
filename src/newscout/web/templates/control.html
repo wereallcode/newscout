@@ -58,7 +58,7 @@
       <span class="unit-icon"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></span>
       <div class="unit-title">
         <h2>AI <span class="state">{{ {'off': 'Off', 'paused': 'Paused', 'on': 'Running', 'problem': 'Problem'}[states.ai] }}</span></h2>
-        <p>{% if states.ai == 'off' %}Add a DeepSeek key to start.{% elif states.ai == 'problem' %}{{ ai_problem }}{% else %}{{ waiting }} raw {{ 'story' if waiting == 1 else 'stories' }} waiting.{% endif %}</p>
+        <p>{% if states.ai == 'off' %}Add a DeepSeek key in Settings to start.{% elif states.ai == 'problem' %}{{ ai_problem }}{% else %}{{ waiting }} raw {{ 'story' if waiting == 1 else 'stories' }} waiting.{% endif %}</p>
       </div>
       {% if key_hint %}
       <form method="post" action="{{ url_for('control.stop_ai' if states.ai in ('on', 'problem') else 'control.start_ai') }}">
@@ -66,62 +66,23 @@
       </form>
       {% endif %}
     </div>
-    <form class="unit-row" method="post" action="{{ url_for('control.language') }}">
-      <span>Write news in</span>
-      <div class="chips">
-        <button class="chip-option {{ 'on' if not language }}" type="submit" name="language" value="" title="Each news item keeps its sources' language">{{ icon('globe') }}Original</button>
-        {% for item in languages %}<button class="chip-option {{ 'on' if item == language }}" type="submit" name="language" value="{{ item }}">{{ item }}</button>{% endfor %}
-      </div>
-    </form>
-    {% if key_hint %}
-    {% set key_state = 'ok' if key_tested else 'problem' if ai_problem else 'unknown' %}
     <div class="unit-row">
-      <div class="key-status {{ key_state }}">
-        <span class="key-icon">{% if key_state == 'problem' %}<svg viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>{% else %}<svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>{% endif %}</span>
-        <span class="key-text"><b>DeepSeek key saved</b><small>Ends with {{ key_hint }} · {{ {'ok': 'Working', 'problem': 'Not working', 'unknown': 'Not tested yet'}[key_state] }}</small></span>
-        <form method="post" action="{{ url_for('control.test_key') }}"><button class="ghost" type="submit">Test</button></form>
-        <form method="post" action="{{ url_for('control.save_key') }}" onsubmit="return confirm('Remove the DeepSeek key?')"><button class="ghost icon-only" type="submit" name="remove" value="1" title="Remove key" aria-label="Remove key">{{ icon('trash') }}</button></form>
-      </div>
-      <details class="replace-key">
-        <summary><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>Replace key</summary>
-        <form class="key-field" method="post" action="{{ url_for('control.save_key') }}">
-          <input name="api_key" type="password" autocomplete="off" placeholder="sk-…" aria-label="New DeepSeek API key">
-          <button class="save" type="submit">Save</button>
-        </form>
-      </details>
+      <span>API key</span>
+      <p class="unit-value">{% if key_hint %}DeepSeek <code>…{{ key_hint }}</code> <span class="state {{ key_state }}">{{ {'ok': 'Active', 'problem': 'Not working', 'unknown': 'Not tested'}[key_state] }}</span>{% else %}Not added{% endif %}</p>
     </div>
-    {% else %}
-    <form class="unit-row" method="post" action="{{ url_for('control.save_key') }}">
-      <span><b>Add your DeepSeek key</b> to let the AI write your Newsroom.</span>
-      <div class="key-field">
-        <input name="api_key" type="password" autocomplete="off" placeholder="sk-…" aria-label="DeepSeek API key">
-        <button class="save" type="submit">Save</button>
-      </div>
-    </form>
-    {% endif %}
+    <div class="unit-row">
+      <span>Writes news in</span>
+      <p class="unit-value">{{ language or 'Original language' }}</p>
+    </div>
+    <div class="unit-row">
+      <span>Instructions</span>
+      <p class="unit-value">{{ 'Custom' if custom_instructions else 'Default' }}</p>
+    </div>
     <div class="unit-foot">
-      <a href="{{ url_for('dashboard.index', step='raw') }}">{{ icon('pencil') }}Edit AI Instructions</a>
+      <a href="{{ url_for('settings.index', tab='ai') }}">{{ icon('pencil') }}{{ 'Add DeepSeek key' if states.ai == 'off' else 'AI settings' }}</a>
     </div>
   </section>
 </div>
 
-<section class="unit clean-up">
-  <div class="unit-head">
-    <span class="unit-icon"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></span>
-    <div class="unit-title"><h2>Clean Up</h2><p>Deleted news stays gone: the feeds cannot bring it back.</p></div>
-  </div>
-  <form class="unit-row" method="post" action="{{ url_for('control.delete_older') }}" onsubmit="return confirm('Delete news older than ' + event.submitter.textContent + '?')">
-    <span>Delete news older than</span>
-    <div class="chips">{% for days in delete_ages %}<button class="chip-option" type="submit" name="days" value="{{ days }}">{{ days }} {{ 'day' if days == 1 else 'days' }}</button>{% endfor %}</div>
-  </form>
-  <form class="unit-row" method="post" action="{{ url_for('control.delete_label') }}" onsubmit="return confirm('Delete every raw story labelled ' + event.submitter.dataset.label + '?')">
-    <span>Delete news labelled</span>
-    <div class="chips">{% for key, label in labels.items() %}<button class="chip-option" type="submit" name="status" value="{{ key }}" data-label="{{ label }}" {{ 'disabled' if not counts.get(key) }}>{{ label }} <small>{{ counts.get(key, 0) }}</small></button>{% endfor %}</div>
-  </form>
-  <form class="unit-foot" method="post" action="{{ url_for('control.delete_all') }}" onsubmit="return confirm('Delete every raw story and news item, keeping sources and settings?')">
-    <span>Delete everything and pause the fetcher.</span>
-    <button class="danger-button" type="submit">Delete all news</button>
-  </form>
-</section>
 <script src="{{ url_for('static', filename='live.js') }}" defer></script>
 {% endblock %}

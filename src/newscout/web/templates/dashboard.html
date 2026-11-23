@@ -8,7 +8,7 @@
   <ol>
     <li><a href="{{ url_for('sources.index') }}">Add a news source</a><span>Paste the feed link of a site you follow.</span></li>
     <li><a href="{{ url_for('control.index') }}">Start the fetcher</a><span>News arrives here and keeps coming.</span></li>
-    <li><a href="{{ url_for('control.index') }}">Add a DeepSeek key</a><span>Optional: the same news from several sources becomes one.</span></li>
+    <li><a href="{{ url_for('settings.index', tab='ai') }}">Add a DeepSeek key</a><span>Optional: the same news from several sources becomes one.</span></li>
   </ol>
 </section>
 {% endif %}
@@ -26,22 +26,6 @@
 </div>
 
 {% if step == 'raw' %}
-<details class="card panel">
-  <summary><svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI Instructions<span>How the AI merges and writes news</span></summary>
-  <form method="post" action="{{ url_for('dashboard.save_instructions') }}">
-    <p class="instruction-note">Each raw story is first checked against its group's relevance instruction, set on the <a href="{{ url_for('sources.index') }}">Sources</a> page, and relevant stories then go through these steps.</p>
-    {% for item in steps %}
-    <label class="instruction">
-      <span class="instruction-head"><b>{{ loop.index + 1 }}. {{ item.title }}</b>{{ item.hint }}</span>
-      <textarea name="{{ item.key }}" rows="4">{{ texts[item.key] }}</textarea>
-    </label>
-    {% endfor %}
-    <div class="panel-foot">
-      <button class="ghost" type="submit" name="reset" value="1">Reset to defaults</button>
-      <button class="save" type="submit">Save</button>
-    </div>
-  </form>
-</details>
 <div class="filters" role="tablist" aria-label="Show">
   {% for key, (label, _) in filters.items() %}
   <a class="chip-option {{ 'on' if key == show }}" role="tab" href="{{ url_for('dashboard.index', step='raw', show=None if key == 'all' else key) }}">{{ label }}<span>{{ counts[key] }}</span></a>
