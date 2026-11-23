@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from newscout import db
+from newscout import db, presets
 from newscout.ai.deepseek import KeyCheck
 from newscout.models import Entry
 from newscout.web import create_app
@@ -700,3 +700,18 @@ def test_paused_group_is_not_fetched(client, conn):
 )
 def test_every_page_names_itself_in_the_tab(client, page, title):
     assert f"<title>{title} - Newscout</title>" in client.get(page).text
+
+
+def test_settings_restores_a_deleted_preset(client, conn):
+    presets.install(conn)
+    gaming = next(g for g in db.groups.list_all(conn) if g.name == "Gaming News")
+    assert "Restore" not in client.get("/settings").text
+    db.groups.delete(conn, gaming.id)
+    assert "Restore" not in client.get("/sources").text
+    assert "Restore" in client.get("/settings").text
+    response = client.post(
+        "/settings/presets/restore", data={"name": "Gaming News"}, follow_redirects=True
+    )
+    assert "Gaming News restored. Switch it on in Control Room" in response.text
+    assert "Gaming News" in {g.name for g in db.groups.list_all(conn)}
+    assert "Restore" not in response.text

@@ -1,6 +1,6 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from newscout import db
+from newscout import db, presets
 from newscout.web.database import conn
 
 bp = Blueprint("settings", __name__)
@@ -15,7 +15,8 @@ def back():
 @bp.get("/settings")
 def index():
     values = {name: db.settings.get(conn(), name) for name in LIMITS}
-    return render_template("settings.html", values=values)
+    missing = {preset.name for preset in presets.missing(conn())}
+    return render_template("settings.html", values=values, presets=presets.PRESETS, missing=missing)
 
 
 @bp.post("/settings")
@@ -27,4 +28,14 @@ def save():
     for name, value in values.items():
         db.settings.put(conn(), name, value)
     flash("Saved.", "ok")
+    return back()
+
+
+@bp.post("/settings/presets/restore")
+def restore_preset():
+    name = request.form.get("name", "")
+    if presets.restore(conn(), name):
+        flash(f"{name} restored. Switch it on in Control Room to start fetching.", "ok")
+    else:
+        flash("This preset can't be restored.")
     return back()

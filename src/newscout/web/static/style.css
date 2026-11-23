@@ -724,6 +724,10 @@ a.source-link:hover { border-color: var(--accent); color: var(--accent); }
 
 .setting + .setting { border-top: 1px solid var(--line-soft); }
 
+.preset-added { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+.preset-added svg { width: 14px; height: 14px; }
+
 .page-head p { margin: 6px 0 0; color: var(--muted); }
 
 .units { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

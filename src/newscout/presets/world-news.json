@@ -1,0 +1,24 @@
+{
+  "name": "World News",
+  "relevance": "Keep world politics, conflicts, diplomacy, economy and major global events.\nDrop sports, celebrity gossip and advertising.",
+  "sources": {
+    "https://feeds.bbci.co.uk/news/world/rss.xml": "BBC World",
+    "https://www.theguardian.com/world/rss": "The Guardian World",
+    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml": "NYT World",
+    "https://feeds.washingtonpost.com/rss/world": "Washington Post World",
+    "https://feeds.npr.org/1004/rss.xml": "NPR World",
+    "https://www.cbsnews.com/latest/rss/world": "CBS News World",
+    "https://abcnews.com/abcnews/internationalheadlines": "ABC News International",
+    "https://www.cbc.ca/webfeed/rss/rss-world": "CBC World",
+    "https://www.independent.co.uk/news/world/rss": "The Independent World",
+    "https://feeds.skynews.com/feeds/rss/world.xml": "Sky News World",
+    "https://rss.dw.com/rdf/rss-en-world": "DW",
+    "https://www.france24.com/en/rss": "France 24",
+    "https://www.lemonde.fr/en/international/rss_full.xml": "Le Monde",
+    "https://www.euronews.com/rss?level=theme&name=news": "Euronews",
+    "https://www.politico.eu/feed/": "Politico Europe",
+    "https://www.aljazeera.com/xml/rss/all.xml": "Al Jazeera",
+    "https://www.scmp.com/rss/91/feed/": "South China Morning Post",
+    "https://news.un.org/feed/subscribe/en/news/all/rss.xml": "UN News"
+  }
+}

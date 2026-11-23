@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
+{% from "_macros.html" import icon %}
 {% block content %}
 <div class="page-head"><h1>Settings</h1></div>
 <form class="card settings" method="post" action="{{ url_for('settings.save') }}">
@@ -18,4 +19,19 @@
   <div class="settings-foot"><button class="save" type="submit">Save</button></div>
 </form>
 
+<section class="card settings presets">
+  {% for preset in presets %}
+  <div class="setting">
+    <span><b>{{ preset.name }}</b><small>{{ preset.sources | length }} sources</small></span>
+    {% if preset.name in missing %}
+    <form method="post" action="{{ url_for('settings.restore_preset') }}">
+      <input type="hidden" name="name" value="{{ preset.name }}">
+      <button class="chip-button" type="submit" title="Add {{ preset.name }} back to Sources, switched off">{{ icon('refresh') }}Restore</button>
+    </form>
+    {% else %}
+    <span class="preset-added">{{ icon('check') }}Added</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
 {% endblock %}
