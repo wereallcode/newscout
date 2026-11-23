@@ -4,16 +4,13 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from newscout import db
 from newscout.ai import instructions, state
-from newscout.ai.deepseek import check_key
 from newscout.models import FetcherState
 from newscout.web.database import conn
-from newscout.web.display import RAW_FILTERS
 
 bp = Blueprint("control", __name__)
 
 STALE = timedelta(minutes=2)
 INTERVALS = (5, 15, 30, 60)
-DELETE_AGES = (1, 7, 30)
 FRESH_OPTIONS = ((30, "30 min"), (60, "1 h"), (360, "6 h"), (1440, "24 h"), (0, "Any time"))
 
 
@@ -65,14 +62,17 @@ def index():
         fresh_minutes=int(db.settings.get(conn(), "fresh_minutes")),
         fresh_options=FRESH_OPTIONS,
         key_hint=key[-4:] if key else None,
-        delete_ages=DELETE_AGES,
-        labels={status: label for status, (label, _) in RAW_FILTERS.items() if status != "all"},
-        counts=counts,
-        groups=db.groups.list_all(conn()),
-        languages=instructions.LANGUAGES,
+        key_state="ok"
+        if state.tested(conn())
+        else "problem"
+        if state.problem(conn())
+        else "unknown",
         language=instructions.language(conn()),
+        custom_instructions=any(
+            db.settings.get(conn(), f"ai_{step.key}") for step in instructions.STEPS
+        ),
+        groups=db.groups.list_all(conn()),
         ai_problem=state.problem(conn()),
-        key_tested=state.tested(conn()),
     )
 
 
@@ -119,12 +119,6 @@ def toggle_group(group_id: int):
     return back()
 
 
-@bp.post("/ai/language")
-def language():
-    instructions.set_language(conn(), request.form.get("language", ""))
-    return back()
-
-
 @bp.post("/ai/start")
 def start_ai():
     state.set_running(conn(), True)
@@ -135,57 +129,3 @@ def start_ai():
 def stop_ai():
     state.set_running(conn(), False)
     return back()
-
-
-@bp.post("/ai/key")
-def save_key():
-    key = request.form.get("api_key", "").strip()
-    if request.form.get("remove"):
-        state.remove_key(conn())
-        flash("Key removed.", "ok")
-    elif key and not key.startswith("sk-"):
-        flash("That is not an API key: a DeepSeek key starts with sk-.")
-    elif key:
-        result = check_key(key)
-        if result.ok:
-            state.save_key(conn(), key)
-        flash(result.message, "ok" if result.ok else "")
-    return redirect(url_for("control.index"))
-
-
-@bp.post("/ai/key/test")
-def test_key():
-    key = state.key(conn())
-    if key:
-        result = check_key(key)
-        state.report(conn(), None if result.ok else result.message)
-        flash(result.message, "ok" if result.ok else "")
-    return redirect(url_for("control.index"))
-
-
-def deleted(count: int):
-    flash(f"Deleted {count} raw {'story' if count == 1 else 'stories'}.", "ok")
-    return redirect(url_for("control.index"))
-
-
-@bp.post("/clean-up/older")
-def delete_older():
-    days = request.form.get("days", type=int)
-    if days not in DELETE_AGES:
-        return redirect(url_for("control.index"))
-    return deleted(db.cleanup.delete_older_than(conn(), datetime.now(UTC) - timedelta(days=days)))
-
-
-@bp.post("/clean-up/label")
-def delete_label():
-    status = request.form.get("status", "")
-    if status not in RAW_FILTERS or status == "all":
-        return redirect(url_for("control.index"))
-    return deleted(db.cleanup.delete_status(conn(), status))
-
-
-@bp.post("/clean-up/all")
-def delete_all():
-    db.cleanup.clear_all(conn())
-    flash("All news deleted and the fetcher paused.", "ok")
-    return redirect(url_for("control.index"))

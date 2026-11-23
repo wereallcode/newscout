@@ -20,13 +20,13 @@ STEPS = (
     Step(
         "merge",
         "Merge",
-        "When two stories are the same news",
+        "Decides when two stories are the same news.",
         "Merge stories that report the same real-world event, even when their headlines differ.",
     ),
     Step(
         "rewrite",
         "Rewrite",
-        "How headlines and descriptions are written",
+        "Sets how headlines and descriptions are written.",
         "Write a new headline: say plainly what happened, who did what and where.\n"
         "No questions, no teasers, no exaggeration; the headline gives the news away.\n"
         "Write a new description: one or two sentences with the key facts.\n"

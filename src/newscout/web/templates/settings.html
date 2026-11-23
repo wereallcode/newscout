@@ -1,13 +1,96 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
-{% from "_macros.html" import icon %}
+{% from "_macros.html" import icon, stage_icon %}
 {% block content %}
-<div class="page-head"><h1>Settings</h1></div>
+<nav class="filters settings-tabs" aria-label="Settings">
+  {% for key, (label, icon_name) in tabs.items() %}
+  <a class="chip-option {{ 'on' if key == tab }}" href="{{ url_for('settings.index', tab=key) }}"{% if key == tab %} aria-current="page"{% endif %}>{{ icon(icon_name) }}{{ label }}</a>
+  {% endfor %}
+</nav>
+
+{% if tab == 'appearance' %}
 <form class="card settings" method="post" action="{{ url_for('settings.save') }}">
+  <input type="hidden" name="tab" value="appearance">
   <label class="setting">
     <span><b>Mark as new</b><small>News younger than this gets a <span class="new-tag">New</span> tag.</small></span>
     <span class="field"><input name="new_minutes" inputmode="numeric" value="{{ values.new_minutes }}">min</span>
   </label>
+  <div class="settings-foot"><button class="save" type="submit">Save</button></div>
+</form>
+
+{% elif tab == 'ai' %}
+<section class="card settings">
+  {% if api_keys %}<input class="toggle" type="checkbox" id="add-key">{% endif %}
+  <h2 class="settings-section">{{ icon('key') }}API Key{% if api_keys %}<label class="section-add" for="add-key" title="Add a key" aria-label="Add a key">{{ icon('plus') }}</label>{% endif %}</h2>
+  <div class="key-box">
+    {% if api_keys %}
+    {% for item in api_keys %}
+    {% set key_state = ('ok' if key_tested else 'problem' if ai_problem else 'unknown') if item.active else 'idle' %}
+    <div class="key-item">
+      <input class="toggle" type="checkbox" id="key-details-{{ item.id }}">
+      <div class="key-status {{ key_state }}">
+        <span class="key-icon">{% if key_state == 'problem' %}<svg viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>{% elif item.active %}<svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>{% else %}{{ icon('key') }}{% endif %}</span>
+        <span class="key-text"><b>DeepSeek <code class="key-hint">…{{ item.hint }}</code>{% if item.active %}<span class="state">{{ {'ok': 'Active', 'problem': 'Not working', 'unknown': 'Not tested'}[key_state] }}</span>{% endif %}</b></span>
+        {% if item.active %}{% if api_keys | length > 1 %}<span class="ghost spacer" aria-hidden="true">Use</span>{% endif %}{% else %}<form method="post" action="{{ url_for('settings.use_key', key_id=item.id) }}"><button class="ghost" type="submit">Use</button></form>{% endif %}
+        <label class="ghost" for="key-details-{{ item.id }}">Details</label>
+        <form method="post" action="{{ url_for('settings.test_key', key_id=item.id) }}"><button class="ghost" type="submit">Test</button></form>
+        <form method="post" action="{{ url_for('settings.delete_key', key_id=item.id) }}" onsubmit="return confirm('Remove the key ending with {{ item.hint }}?')"><button class="ghost icon-only" type="submit" title="Remove key" aria-label="Remove key">{{ icon('trash') }}</button></form>
+      </div>
+      <dl class="key-details">
+        <dt>Key</dt><dd>Ends with {{ item.hint }}</dd>
+        <dt>Added</dt><dd>{{ item.added_at }}</dd>
+        <dt>Status</dt><dd>{% if item.active %}{{ {'ok': 'In use and working: the last test passed.', 'problem': ai_problem, 'unknown': 'In use, not tested yet. Press Test to check it.'}[key_state] }}{% else %}Not in use. Press Use to switch the AI to this key.{% endif %}</dd>
+      </dl>
+    </div>
+    {% endfor %}
+    <form class="key-field add-key-form" method="post" action="{{ url_for('settings.add_key') }}">
+      <input name="api_key" type="password" autocomplete="off" placeholder="sk-…" aria-label="New DeepSeek API key">
+      <button class="save" type="submit">Add</button>
+      <label class="ghost icon-only" for="add-key" title="Cancel" aria-label="Cancel">{{ icon('close') }}</label>
+    </form>
+    {% else %}
+    <form class="key-add" method="post" action="{{ url_for('settings.add_key') }}">
+      <span><b>Add your DeepSeek key</b> to let the AI write your Newsroom.</span>
+      <div class="key-field">
+        <input name="api_key" type="password" autocomplete="off" placeholder="sk-…" aria-label="DeepSeek API key">
+        <button class="save" type="submit">Save</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card settings">
+  <h2 class="settings-section">{{ icon('globe') }}Language</h2>
+  <form class="setting" method="post" action="{{ url_for('settings.language') }}">
+    <span><b>Write news in</b><small>Original keeps each news item in its sources' language.</small></span>
+    <div class="chips">
+      <button class="chip-option {{ 'on' if not texts.language }}" type="submit" name="language" value="">{{ icon('globe') }}Original</button>
+      {% for item in languages %}<button class="chip-option {{ 'on' if item == texts.language }}" type="submit" name="language" value="{{ item }}">{{ item }}</button>{% endfor %}
+    </div>
+  </form>
+</section>
+
+<section class="card settings">
+  <h2 class="settings-section">{{ stage_icon('raw') }}Raw (Instructions)</h2>
+  <form method="post" action="{{ url_for('settings.save_instructions') }}">
+    {% for item in steps %}
+    <label class="setting stacked">
+      <span><b>{{ item.title }}</b><small>{{ item.hint }}</small></span>
+      <textarea name="{{ item.key }}" rows="4">{{ texts[item.key] }}</textarea>
+    </label>
+    {% endfor %}
+    <div class="settings-foot">
+      <button class="ghost" type="submit" name="reset" value="1">Reset to defaults</button>
+      <button class="save" type="submit">Save</button>
+    </div>
+  </form>
+</section>
+
+{% elif tab == 'storage' %}
+<form class="card settings" method="post" action="{{ url_for('settings.save') }}">
+  <h2 class="settings-section">{{ icon('clock') }}Clean Up (Automatic)</h2>
+  <input type="hidden" name="tab" value="storage">
   <label class="setting">
     <span><b>Empty trash after</b><small>Trashed news is deleted for good.</small></span>
     <span class="field"><input name="trash_days" inputmode="numeric" value="{{ values.trash_days }}">days</span>
@@ -19,6 +102,23 @@
   <div class="settings-foot"><button class="save" type="submit">Save</button></div>
 </form>
 
+<section class="card settings">
+  <h2 class="settings-section">{{ icon('trash') }}Clean Up (Manual)</h2>
+  <form class="setting" method="post" action="{{ url_for('settings.delete_older') }}" onsubmit="return confirm('Delete news older than ' + event.submitter.textContent + '?')">
+    <span><b>Delete news older than</b></span>
+    <div class="chips">{% for days in delete_ages %}<button class="chip-option" type="submit" name="days" value="{{ days }}">{{ days }} {{ 'day' if days == 1 else 'days' }}</button>{% endfor %}</div>
+  </form>
+  <form class="setting" method="post" action="{{ url_for('settings.delete_label') }}" onsubmit="return confirm('Delete every raw story labelled ' + event.submitter.dataset.label + '?')">
+    <span><b>Delete news labelled</b></span>
+    <div class="chips">{% for key, label in labels.items() %}<button class="chip-option" type="submit" name="status" value="{{ key }}" data-label="{{ label }}" {{ 'disabled' if not counts.get(key) }}>{{ label }} <small>{{ counts.get(key, 0) }}</small></button>{% endfor %}</div>
+  </form>
+  <form class="setting" method="post" action="{{ url_for('settings.delete_all') }}" onsubmit="return confirm('Delete every raw story and news item, keeping sources and settings?')">
+    <span><b>Delete all news</b><small>Also pauses the fetcher. Sources and settings stay. Deleted news cannot come back from the feeds.</small></span>
+    <button class="danger-button" type="submit">Delete</button>
+  </form>
+</section>
+
+{% elif tab == 'presets' %}
 <section class="card settings presets">
   {% for preset in presets %}
   <div class="setting">
@@ -34,4 +134,5 @@
   </div>
   {% endfor %}
 </section>
+{% endif %}
 {% endblock %}

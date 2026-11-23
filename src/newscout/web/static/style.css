@@ -163,12 +163,76 @@ main { padding-top: 32px; padding-bottom: 72px; }
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.1s, background 0.15s;
+  transition: transform 0.1s, background 0.25s, color 0.25s;
 }
 
-.primary, .save { color: #fff; background: var(--text); box-shadow: 0 8px 18px -8px rgba(18, 17, 39, 0.6); }
+.primary { color: #fff; background: var(--text); box-shadow: 0 8px 18px -8px rgba(18, 17, 39, 0.6); }
 
-.primary:hover, .save:hover { background: var(--accent); }
+.save { color: var(--text); background: rgba(18, 17, 39, 0.07); }
+
+.primary:hover { background: var(--accent); }
+
+.save:hover { background: rgba(18, 17, 39, 0.12); }
+
+.save.saved { color: #fff; background: var(--ok); }
+
+.save svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5; }
+
+.save.pop { animation: save-pop 0.4s ease-out; }
+
+@keyframes save-pop {
+  0% { transform: scale(0.9); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.settings-section { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-bottom: 1px solid var(--line-soft); color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+
+.settings-section svg { width: 14px; height: 14px; }
+
+.key-box { padding: 18px 24px; }
+
+.toggle { position: absolute; opacity: 0; pointer-events: none; }
+
+.key-item + .key-item { margin-top: 8px; }
+
+.key-details { display: none; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 8px 0 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 13px; }
+
+.key-details dt { color: var(--text); font-weight: 700; }
+
+.key-details dd { margin: 0; }
+
+.key-item > .toggle:checked ~ .key-details { display: grid; }
+
+.key-item > .toggle:checked ~ .key-status label.ghost { background: rgba(18, 17, 39, 0.12); }
+
+.key-item > .toggle:focus-visible ~ .key-status label.ghost { outline: 4px solid var(--accent-soft); }
+
+.key-hint { color: var(--muted); font: 500 12px var(--mono); }
+
+.key-status.idle { background: var(--card); }
+
+.ghost.spacer { visibility: hidden; }
+
+.key-field.add-key-form { display: none; margin-top: 8px; }
+
+#add-key:checked ~ .key-box .key-field.add-key-form { display: flex; }
+
+#add-key:checked ~ .settings-section .section-add { color: var(--text); background: rgba(18, 17, 39, 0.12); }
+
+#add-key:focus-visible ~ .settings-section .section-add { outline: 4px solid var(--accent-soft); }
+
+.section-add { display: grid; place-items: center; width: 26px; height: 26px; margin-left: auto; border-radius: 8px; color: var(--muted); background: rgba(18, 17, 39, 0.06); cursor: pointer; }
+
+.section-add:hover { color: var(--text); background: rgba(18, 17, 39, 0.12); }
+
+.settings-section .section-add svg { width: 14px; height: 14px; }
+
+.key-box { position: relative; }
+
+.key-add { display: grid; gap: 10px; margin: 0; color: var(--muted); font-size: 13px; }
+
+.key-add b { color: var(--text); }
 
 .primary svg { fill: currentColor; }
 
@@ -509,6 +573,14 @@ a.source-link:hover { border-color: var(--accent); color: var(--accent); }
 
 .settings + .settings { margin-top: 16px; }
 
+.settings > form + form > .setting:first-child { border-top: 1px solid var(--line-soft); }
+
+.settings > form.setting + form.setting { border-top: 1px solid var(--line-soft); }
+
+.setting.stacked { flex-direction: column; align-items: stretch; gap: 10px; }
+
+.setting > .chips { flex-wrap: wrap; }
+
 .settings-foot { gap: 10px; }
 
 .rank {
@@ -625,23 +697,9 @@ a.source-link:hover { border-color: var(--accent); color: var(--accent); }
 
 .ai-arrow small { color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
 
-.panel { margin-bottom: 16px; overflow: visible; }
-
-.panel summary { display: flex; align-items: center; gap: 10px; padding: 14px 20px; list-style: none; cursor: pointer; font-weight: 800; }
-
-.panel summary::-webkit-details-marker { display: none; }
-
-.panel summary svg { color: var(--accent); }
-
-.panel summary span { margin-left: auto; color: var(--muted); font-size: 13px; font-weight: 600; }
-
-.panel[open] summary { border-bottom: 1px solid var(--line-soft); }
-
-.panel form { padding: 16px 20px; }
-
 .panel-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
 
-.panel textarea {
+.settings textarea {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -652,7 +710,7 @@ a.source-link:hover { border-color: var(--accent); color: var(--accent); }
   resize: vertical;
 }
 
-.panel textarea:focus { border-color: var(--accent); outline: 4px solid var(--accent-soft); }
+.settings textarea:focus { border-color: var(--accent); outline: 4px solid var(--accent-soft); }
 
 .raw-status {
   flex: none;
@@ -708,12 +766,6 @@ a.source-link:hover { border-color: var(--accent); color: var(--accent); }
 
 .bar-inner { gap: 12px; }
 
-.instruction { display: grid; gap: 6px; margin-bottom: 14px; }
-
-.instruction-head { display: flex; gap: 8px; align-items: baseline; color: var(--muted); font-size: 13px; }
-
-.instruction-head b { color: var(--text); font-size: 14px; }
-
 .setting > span:first-child { display: grid; gap: 2px; color: var(--muted); }
 
 .setting small { font-size: 13px; }
@@ -759,6 +811,14 @@ a.source-link:hover { border-color: var(--accent); color: var(--accent); }
 .unit-row { display: grid; gap: 8px; margin: 0; padding: 14px 20px; border-top: 1px solid var(--line-soft); color: var(--muted); font-size: 13px; font-weight: 600; }
 
 .unit-row .chips { width: fit-content; }
+
+.unit-value { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--text); font-size: 14px; font-weight: 700; }
+
+.unit-value code { color: var(--muted); font: 500 12px var(--mono); }
+
+.unit-value .state.ok { color: #047857; background: #d1fae5; }
+
+.unit-value .state.problem { color: #b91c1c; background: #fee2e2; }
 
 .key-field { display: flex; gap: 8px; }
 
@@ -826,9 +886,6 @@ a.number:hover { border-color: var(--accent); }
   .numbers { grid-template-columns: 1fr 1fr; }
 }
 
-.clean-up { margin-top: 16px; }
-
-.clean-up .unit-icon { color: #b91c1c; background: #fef2f2; }
 
 .chip-option small { color: var(--faint); font: 600 11px var(--mono); }
 
@@ -888,11 +945,6 @@ a.number:hover { border-color: var(--accent); }
 
 .unit-row .chips form { margin: 0; }
 
-.instruction select { width: fit-content; padding: 9px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font: inherit; }
-
-.instruction-note { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
-
-.instruction-note a { color: var(--accent); font-weight: 700; }
 
 .key-status { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #faf9fd; }
 
@@ -906,7 +958,11 @@ a.number:hover { border-color: var(--accent); }
 
 .key-text { display: grid; flex: 1; min-width: 0; color: var(--muted); }
 
-.key-text b { color: var(--text); font-size: 14px; }
+.key-text b { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; }
+
+.key-status.ok .state { color: #047857; background: #d1fae5; }
+
+.key-status.problem .state { color: #b91c1c; background: #fee2e2; }
 
 .key-text small { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -918,19 +974,12 @@ a.number:hover { border-color: var(--accent); }
 
 .key-status.problem .key-icon { color: #fff; background: var(--error); }
 
-.replace-key { margin-top: 8px; border: 1px dashed var(--line); border-radius: 14px; background: #fcfcfe; }
 
-.replace-key summary { display: flex; align-items: center; gap: 10px; padding: 12px 14px; color: var(--muted); font-weight: 700; list-style: none; cursor: pointer; }
 
-.replace-key summary::-webkit-details-marker { display: none; }
 
-.replace-key summary:hover { color: var(--accent); }
 
-.replace-key summary svg { width: 16px; height: 16px; }
 
-.replace-key[open] summary svg { transform: rotate(180deg); }
 
-.replace-key .key-field { padding: 0 14px 14px; }
 
 .unit-row b { color: var(--text); }
 
