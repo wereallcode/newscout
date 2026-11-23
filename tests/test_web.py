@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from newscout import db, presets
+from newscout.ai import state
 from newscout.ai.deepseek import KeyCheck
 from newscout.models import Entry
 from newscout.web import create_app
@@ -158,7 +159,7 @@ def test_settings_saves_the_new_window(client, conn):
     response = client.post("/settings", data={"new_minutes": "5"}, follow_redirects=True)
     assert db.settings.get(conn, "new_minutes") == "5"
     assert "Saved" in response.text
-    assert 'value="5"' in client.get("/settings").text
+    assert 'value="5"' in client.get("/settings?tab=appearance").text
 
 
 @pytest.mark.parametrize("value", ["0", "1441", "abc", ""])
@@ -283,26 +284,84 @@ def key_check(monkeypatch):
     """Keys are checked against DeepSeek when saved; tests answer instead of the network."""
     results = {"sk-bad": KeyCheck(False, "DeepSeek rejected this key.")}
     monkeypatch.setattr(
-        "newscout.web.views.control.check_key",
+        "newscout.web.views.settings.check_key",
         lambda key: results.get(key, KeyCheck(True, "Key works with a balance of 4.20 USD.")),
     )
 
 
 def test_api_key_is_saved_masked_and_removable(client, conn):
-    response = client.post("/ai/key", data={"api_key": " sk-abcdef1234 "}, follow_redirects=True)
+    response = client.post(
+        "/settings/ai/keys", data={"api_key": " sk-abcdef1234 "}, follow_redirects=True
+    )
     assert "Key works with a balance of 4.20 USD" in response.text
-    assert db.settings.get(conn, "deepseek_api_key") == "sk-abcdef1234"
-    page = client.get("/control").text
-    assert "sk-abcdef1234" not in page and "DeepSeek key saved" in page
-    assert "Ends with 1234 · Working" in page
-    client.post("/ai/key", data={"remove": "1"})
-    assert db.settings.get(conn, "deepseek_api_key") is None
+    assert state.key(conn) == "sk-abcdef1234"
+    page = client.get("/settings?tab=ai").text
+    assert "sk-abcdef1234" not in page and "Ends with 1234" in page
+    assert '<span class="state">Active</span>' in page
+    client.post(f"/settings/ai/keys/{state.keys(conn)[0].id}/delete")
+    assert state.key(conn) is None and state.keys(conn) == []
 
 
 def test_empty_api_key_keeps_the_saved_one(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-keep")
-    client.post("/ai/key", data={"api_key": ""})
-    assert db.settings.get(conn, "deepseek_api_key") == "sk-keep"
+    client.post("/settings/ai/keys", data={"api_key": ""})
+    assert state.key(conn) == "sk-keep"
+
+
+def test_the_old_single_key_moves_into_the_key_list(conn):
+    db.settings.put(conn, "deepseek_api_key", "sk-old1234")
+    [item] = state.keys(conn)
+    assert item.hint == "1234" and item.active
+    assert db.settings.get(conn, "deepseek_api_key") is None
+    assert state.key(conn) == "sk-old1234"
+
+
+def test_several_keys_can_be_added_and_one_is_used(client, conn):
+    client.post("/settings/ai/keys", data={"api_key": "sk-first111"})
+    client.post("/settings/ai/keys", data={"api_key": "sk-second22"})
+    first, second = state.keys(conn)
+    assert state.key(conn) == "sk-second22" and second.active and not first.active
+    page = client.get("/settings?tab=ai").text
+    assert f'action="/settings/ai/keys/{first.id}/use"' in page
+    assert f'action="/settings/ai/keys/{second.id}/use"' not in page
+    response = client.post(f"/settings/ai/keys/{first.id}/use", follow_redirects=True)
+    assert "Switched keys." in response.text
+    assert state.key(conn) == "sk-first111" and state.tested(conn)
+
+
+def test_switching_to_a_broken_key_reports_the_problem(client, conn):
+    client.post("/settings/ai/keys", data={"api_key": "sk-good111"})
+    with conn:
+        conn.execute("INSERT INTO api_keys (value) VALUES ('sk-bad')")
+    bad = next(k for k in state.keys(conn) if k.hint == "-bad")
+    client.post(f"/settings/ai/keys/{bad.id}/use")
+    assert state.key(conn) == "sk-bad"
+    assert state.problem(conn) == "DeepSeek rejected this key."
+
+
+def test_a_key_cannot_be_added_twice(client, conn):
+    client.post("/settings/ai/keys", data={"api_key": "sk-same1234"})
+    response = client.post(
+        "/settings/ai/keys", data={"api_key": "sk-same1234"}, follow_redirects=True
+    )
+    assert "This key is already added." in response.text
+    assert len(state.keys(conn)) == 1
+
+
+def test_removing_the_key_in_use_hands_over_to_the_newest(client, conn):
+    for value in ("sk-one11111", "sk-two22222", "sk-three333"):
+        client.post("/settings/ai/keys", data={"api_key": value})
+    one, two, three = state.keys(conn)
+    client.post(f"/settings/ai/keys/{one.id}/use")
+    client.post(f"/settings/ai/keys/{one.id}/delete")
+    assert state.key(conn) == "sk-three333" and not state.tested(conn)
+    client.post(f"/settings/ai/keys/{two.id}/delete")
+    assert state.key(conn) == "sk-three333"
+
+
+def test_unknown_keys_are_not_found(client):
+    assert client.post("/settings/ai/keys/99/use").status_code == 404
+    assert client.post("/settings/ai/keys/99/delete").status_code == 404
 
 
 def test_failing_sources_are_not_counted_as_working(client, conn):
@@ -416,18 +475,22 @@ def test_news_only_shows_what_the_ai_kept(client, conn):
     assert "Unchecked" in client.get("/?step=raw&show=waiting").text
 
 
-def test_ai_instructions_live_on_the_raw_tab(client, conn):
-    assert "AI Instructions" in client.get("/?step=raw").text
-    assert "AI Instructions" not in client.get("/").text
-    assert "Merge stories that report the same real-world event" in client.get("/?step=raw").text
+def test_ai_instructions_live_in_settings(client, conn):
+    default = "Merge stories that report the same real-world event"
+    assert default in client.get("/settings").text
+    assert default not in client.get("/settings?tab=appearance").text
+    assert default in client.get("/settings?tab=ai").text
+    assert default not in client.get("/?step=raw").text
+    assert 'href="/settings?tab=ai"' in client.get("/control").text
 
 
 def test_ai_instructions_can_be_edited_and_reset(client, conn):
     form = {"merge": "Same event.", "rewrite": "Be brief."}
-    client.post("/instructions", data=form)
+    response = client.post("/settings/ai/instructions", data=form)
+    assert response.headers["Location"].endswith("/settings?tab=ai")
     assert db.settings.get(conn, "ai_merge") == "Same event."
-    assert "Be brief." in client.get("/?step=raw").text
-    client.post("/instructions", data={**form, "reset": "1"})
+    assert "Be brief." in client.get("/settings?tab=ai").text
+    client.post("/settings/ai/instructions", data={**form, "reset": "1"})
     assert db.settings.get(conn, "ai_merge") is None
 
 
@@ -531,11 +594,12 @@ def test_fetcher_freshness_choice(client, conn):
     assert db.settings.get(conn, "fresh_minutes") == "0"
 
 
-def test_delete_all_news_from_the_control_room(client, conn):
+def test_delete_all_news_from_settings(client, conn):
     story(conn, "https://a.example/feed", "Gone soon")
-    assert "Delete all news" not in client.get("/settings").text
-    assert "Delete all news" in client.get("/control").text
-    client.post("/clean-up/all")
+    assert "Delete all news" not in client.get("/control").text
+    assert "Delete all news" in client.get("/settings?tab=storage").text
+    response = client.post("/settings/clean-up/all")
+    assert response.headers["Location"].endswith("/settings?tab=storage")
     assert db.news.count(conn) == 0 and db.stories.list_raw(conn) == []
     assert len(db.sources.list_all(conn)) == 1
 
@@ -543,10 +607,10 @@ def test_delete_all_news_from_the_control_room(client, conn):
 def test_delete_news_older_than_a_few_days(client, conn):
     story(conn, "https://a.example/feed", "Old", when=datetime.now(UTC) - timedelta(days=10))
     story(conn, "https://b.example/feed", "Fresh", when=datetime.now(UTC))
-    response = client.post("/clean-up/older", data={"days": "7"}, follow_redirects=True)
+    response = client.post("/settings/clean-up/older", data={"days": "7"}, follow_redirects=True)
     assert "Deleted 1 raw story." in response.text
     assert [e.title for e in db.news.list_page(conn)] == ["Fresh"]
-    client.post("/clean-up/older", data={"days": "2"})
+    client.post("/settings/clean-up/older", data={"days": "2"})
     assert db.news.count(conn) == 1
 
 
@@ -554,10 +618,10 @@ def test_delete_news_by_label(client, conn):
     story(conn, "https://a.example/feed", "Kept")
     source = db.sources.add(conn, "https://b.example/feed")
     db.stories.save(conn, source, [Entry("w", "Waiting", "", "", NOW)], NOW)
-    assert 'name="status" value="waiting"' in client.get("/control").text
-    client.post("/clean-up/label", data={"status": "waiting"})
+    assert 'name="status" value="waiting"' in client.get("/settings?tab=storage").text
+    client.post("/settings/clean-up/label", data={"status": "waiting"})
     assert db.stories.counts(conn) == {"kept": 1, "gone": 1}
-    client.post("/clean-up/label", data={"status": "gone"})
+    client.post("/settings/clean-up/label", data={"status": "gone"})
     assert db.stories.counts(conn) == {"kept": 1, "gone": 1}
 
 
@@ -583,35 +647,39 @@ def test_top_bar_ai_state(client, conn):
 
 
 def test_control_room_says_when_ai_needs_a_key(client, conn):
-    assert "Add a DeepSeek key to start." in client.get("/control").text
+    page = client.get("/control").text
+    assert "Add a DeepSeek key in Settings to start." in page
+    assert 'href="/settings?tab=ai"' in page and 'name="api_key"' not in page
+    assert 'name="api_key"' in client.get("/settings?tab=ai").text
     db.settings.put(conn, "deepseek_api_key", "sk-x")
-    assert "Add a DeepSeek key to start." not in client.get("/control").text
+    assert "Add a DeepSeek key in Settings to start." not in client.get("/control").text
 
 
 def test_a_new_key_clears_the_old_problem(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-old")
     db.settings.put(conn, "ai_status", "Problem: 401")
-    client.post("/ai/key", data={"api_key": "sk-new"})
+    client.post("/settings/ai/keys", data={"api_key": "sk-new"})
     assert db.settings.get(conn, "ai_status") == "ok"
     assert 'class="switch on"' in client.get("/").text
 
 
 def test_rejected_key_is_not_saved(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-keep")
-    response = client.post("/ai/key", data={"api_key": "sk-bad"}, follow_redirects=True)
+    response = client.post("/settings/ai/keys", data={"api_key": "sk-bad"}, follow_redirects=True)
     assert "DeepSeek rejected this key." in response.text
-    assert db.settings.get(conn, "deepseek_api_key") == "sk-keep"
+    assert state.key(conn) == "sk-keep" and len(state.keys(conn)) == 1
 
 
 def test_key_without_sk_prefix_is_explained(client, conn):
-    response = client.post("/ai/key", data={"api_key": "f37abc"}, follow_redirects=True)
+    response = client.post("/settings/ai/keys", data={"api_key": "f37abc"}, follow_redirects=True)
     assert "starts with sk-" in response.text
-    assert db.settings.get(conn, "deepseek_api_key") is None
+    assert state.keys(conn) == []
 
 
 def test_test_button_checks_the_saved_key(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-bad")
-    response = client.post("/ai/key/test", follow_redirects=True)
+    [item] = state.keys(conn)
+    response = client.post(f"/settings/ai/keys/{item.id}/test", follow_redirects=True)
     assert "DeepSeek rejected this key." in response.text
     assert db.settings.get(conn, "ai_status") == "Problem: DeepSeek rejected this key."
 
@@ -657,13 +725,16 @@ def test_control_room_is_highlighted_in_the_top_bar(client):
     assert nav in client.get("/control").text and nav not in client.get("/settings").text
 
 
-def test_newsroom_language_is_chosen_in_the_control_room(client, conn):
+def test_newsroom_language_is_chosen_in_settings(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-x")
-    assert 'name="language" value="Turkish"' in client.get("/control").text
-    assert 'name="language"' not in client.get("/?step=raw").text
-    client.post("/ai/language", data={"language": "Turkish"})
+    assert 'name="language" value="Turkish"' in client.get("/settings?tab=ai").text
+    assert 'name="language"' not in client.get("/control").text
+    client.post("/settings/ai/language", data={"language": "Turkish"})
     assert db.settings.get(conn, "news_language") == "Turkish"
-    client.post("/ai/language", data={"language": "Klingon"})
+    assert 'class="chip-option on" type="submit" name="language" value="Turkish"' in (
+        client.get("/settings?tab=ai").text
+    )
+    client.post("/settings/ai/language", data={"language": "Klingon"})
     assert db.settings.get(conn, "news_language") is None
 
 
@@ -703,15 +774,37 @@ def test_every_page_names_itself_in_the_tab(client, page, title):
 
 
 def test_settings_restores_a_deleted_preset(client, conn):
+    button = "Restore</button>"
     presets.install(conn)
     gaming = next(g for g in db.groups.list_all(conn) if g.name == "Gaming News")
-    assert "Restore" not in client.get("/settings").text
+    assert button not in client.get("/settings?tab=presets").text
     db.groups.delete(conn, gaming.id)
-    assert "Restore" not in client.get("/sources").text
-    assert "Restore" in client.get("/settings").text
+    assert button not in client.get("/sources").text
+    assert button in client.get("/settings?tab=presets").text
     response = client.post(
         "/settings/presets/restore", data={"name": "Gaming News"}, follow_redirects=True
     )
     assert "Gaming News restored. Switch it on in Control Room" in response.text
     assert "Gaming News" in {g.name for g in db.groups.list_all(conn)}
-    assert "Restore" not in response.text
+    assert button not in response.text
+
+
+def test_settings_tabs_show_one_group_and_saving_returns_to_it(client, conn):
+    assert 'name="merge"' in client.get("/settings").text
+    assert 'name="merge"' in client.get("/settings?tab=nope").text
+    storage = client.get("/settings?tab=storage").text
+    assert 'name="trash_days"' in storage and 'name="new_minutes"' not in storage
+    response = client.post("/settings", data={"tab": "storage", "trash_days": "3"})
+    assert response.headers["Location"].endswith("/settings?tab=storage")
+    assert db.settings.get(conn, "trash_days") == "3"
+
+
+def test_control_room_ai_card_summarises_the_ai_settings(client, conn):
+    page = client.get("/control").text
+    assert "Not added" in page and "Original language" in page and ">Default<" in page
+    db.settings.put(conn, "deepseek_api_key", "sk-abcd1234")
+    db.settings.put(conn, "news_language", "Turkish")
+    db.settings.put(conn, "ai_rewrite", "Be brief.")
+    page = client.get("/control").text
+    assert "…1234" in page and "Not tested" in page
+    assert ">Turkish<" in page and ">Custom<" in page

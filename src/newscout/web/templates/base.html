@@ -19,7 +19,7 @@
       <div class="control-bar" id="control-bar" data-live aria-label="Quick start and pause">
         {% set fetching = states.fetcher == 'running' %}
         {{ switch('control.stop_fetcher' if fetching else 'control.start_fetcher', 'Fetcher', fetching, states.fetcher | replace(' ', '-')) }}
-        {% if states.ai == 'off' %}<a class="switch off" href="{{ url_for('control.index') }}" title="Add a DeepSeek key to start the AI"><span class="dot"></span>AI<span class="act"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>
+        {% if states.ai == 'off' %}<a class="switch off" href="{{ url_for('settings.index', tab='ai') }}" title="Add a DeepSeek key to start the AI"><span class="dot"></span>AI<span class="act"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>
         {% else %}{{ switch('control.start_ai' if states.ai == 'paused' else 'control.stop_ai', 'AI', states.ai != 'paused', states.ai) }}{% endif %}
       </div>
       <nav>
@@ -43,5 +43,6 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <script src="{{ url_for('static', filename='save.js') }}" defer></script>
 </body>
 </html>

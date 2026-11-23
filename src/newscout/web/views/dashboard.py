@@ -1,9 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
 from newscout import db
-from newscout.ai import instructions
 from newscout.web.database import conn
 from newscout.web.display import RAW_FILTERS
 
@@ -56,20 +55,7 @@ def index():
         counts=counts,
         news_count=news_count,
         has_sources=bool(db.sources.list_all(conn())),
-        steps=instructions.STEPS,
-        texts=instructions.load(conn()),
     )
-
-
-@bp.post("/instructions")
-def save_instructions():
-    if request.form.get("reset"):
-        instructions.save(conn(), {})
-        flash("Instructions reset to the defaults.", "ok")
-    else:
-        instructions.save(conn(), request.form)
-        flash("Instructions saved.", "ok")
-    return redirect(url_for("dashboard.index", step="raw"))
 
 
 def found(story_id: int) -> None:
