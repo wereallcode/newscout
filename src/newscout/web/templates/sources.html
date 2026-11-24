@@ -2,7 +2,6 @@
 {% block title %}Sources{% endblock %}
 {% from "_macros.html" import avatar, icon %}
 {% block content %}
-<div class="page-head sources-head"><h1>Sources</h1></div>
 <form class="add" method="post" action="{{ url_for('sources.add') }}">
   <input name="url" type="url" placeholder="Paste a news feed link." required autofocus aria-label="News feed link">
   {% if groups %}<select name="group_id" aria-label="Group">{% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}</select>{% endif %}

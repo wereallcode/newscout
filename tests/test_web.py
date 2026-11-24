@@ -185,7 +185,7 @@ def test_stop(client, conn):
 def test_fetcher_on_fresh_db_says_not_responding(client):
     response = client.get("/control")
     assert response.status_code == 200
-    assert "Not working" in response.text
+    assert "Not Working" in response.text
 
 
 def test_fetcher_running_with_fresh_heartbeat(client, conn):
@@ -296,7 +296,7 @@ def test_api_key_is_saved_masked_and_removable(client, conn):
     assert "Key works with a balance of 4.20 USD" in response.text
     assert state.key(conn) == "sk-abcdef1234"
     page = client.get("/settings?tab=ai").text
-    assert "sk-abcdef1234" not in page and "Ends with 1234" in page
+    assert "sk-abcdef1234" not in page and "…1234" in page
     assert '<span class="state">Active</span>' in page
     client.post(f"/settings/ai/keys/{state.keys(conn)[0].id}/delete")
     assert state.key(conn) is None and state.keys(conn) == []
@@ -438,9 +438,9 @@ def test_posts_from_other_sites_are_refused(client, conn):
 
 def test_first_run_guide_when_there_are_no_sources(client, conn):
     text = client.get("/").text
-    assert "Add a news source" in text and "Start the fetcher" in text
+    assert "Add a News Source" in text and "Start the Fetcher" in text
     db.sources.add(conn, "https://a.example/feed")
-    assert "Add a news source" not in client.get("/").text
+    assert "Add a News Source" not in client.get("/").text
 
 
 def test_the_ai_card_shows_what_it_did_today(client):
@@ -609,8 +609,8 @@ def test_fetcher_freshness_choice(client, conn):
 
 def test_delete_all_news_from_settings(client, conn):
     story(conn, "https://a.example/feed", "Gone soon")
-    assert "Delete all news" not in client.get("/control").text
-    assert "Delete all news" in client.get("/settings?tab=storage").text
+    assert "Delete All News" not in client.get("/control").text
+    assert "Delete All News" in client.get("/settings?tab=storage").text
     response = client.post("/settings/clean-up/all")
     assert response.headers["Location"].endswith("/settings?tab=storage")
     assert db.news.count(conn) == 0 and db.stories.list_raw(conn) == []
@@ -819,7 +819,7 @@ def test_control_room_ai_card_summarises_the_ai_settings(client, conn):
     db.settings.put(conn, "news_language", "Turkish")
     db.settings.put(conn, "ai_rewrite", "Be brief.")
     page = client.get("/control").text
-    assert "…1234" in page and "Not tested" in page
+    assert "…1234" in page and "Not Tested" in page
     assert ">Turkish<" in page and ">Custom<" in page
 
 

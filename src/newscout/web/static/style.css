@@ -196,13 +196,15 @@ main { padding-top: 32px; padding-bottom: 72px; }
 
 .key-item + .key-item { margin-top: 8px; }
 
-.key-details { display: none; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 8px 0 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 13px; }
+.key-details { display: none; margin: 0; padding: 12px 14px 14px 58px; border: 1px solid var(--line); border-top: 1px dashed var(--line); border-radius: 0 0 14px 14px; background: var(--card); color: var(--muted); font-size: 13px; }
 
-.key-details dt { color: var(--text); font-weight: 700; }
+.key-item > .toggle:checked ~ .key-status { border-bottom-color: transparent; border-radius: 14px 14px 0 0; }
 
-.key-details dd { margin: 0; }
+.key-status.ok ~ .key-details { border-color: #a7f3d0; }
 
-.key-item > .toggle:checked ~ .key-details { display: grid; }
+.key-status.problem ~ .key-details { border-color: #fecaca; }
+
+.key-item > .toggle:checked ~ .key-details { display: block; }
 
 .key-item > .toggle:checked ~ .key-status label.ghost { background: rgba(18, 17, 39, 0.12); }
 
