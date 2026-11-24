@@ -20,3 +20,21 @@ for (const group of document.querySelectorAll("details[data-group]")) {
     }
   });
 }
+
+// The pencil sits in the group's header: it opens the group and its edit form
+// without folding the group shut, which a click inside the header would do.
+for (const pencil of document.querySelectorAll("label.group-edit-toggle")) {
+  pencil.addEventListener("click", (event) => {
+    event.preventDefault();
+    const group = pencil.closest("details");
+    const box = document.getElementById(pencil.htmlFor);
+    box.checked = !box.checked || !group.open;
+    group.open = true;
+    if (box.checked) group.querySelector(".group-edit input").focus();
+  });
+}
+
+// Opening Add group puts the cursor straight in the name field.
+document.getElementById("new-group")?.addEventListener("change", (event) => {
+  if (event.target.checked) document.querySelector(".new-group input").focus();
+});
