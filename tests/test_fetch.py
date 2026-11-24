@@ -33,8 +33,6 @@ def entries(*guids):
 
 
 class Fake:
-    """Routes each source URL to a callable returning a FeedResult or raising."""
-
     def __init__(self, routes):
         self.routes = routes
 
@@ -184,7 +182,6 @@ def test_run_pass_returns_none_when_nothing_due(conn):
 
 
 def loop_once(path, monkeypatch, routes, on_pass=None):
-    """Runs run_forever for two polls with fake collectors."""
     stop = threading.Event()
     polls = []
     real = REAL_RUN_PASS

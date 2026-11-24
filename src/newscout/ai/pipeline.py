@@ -34,7 +34,6 @@ class Judge(Protocol):
 def handle(
     conn: sqlite3.Connection, judge: Judge, instructions: dict[str, str], story: Story
 ) -> None:
-    # Each finished step is saved, so after a failure the story resumes where it stopped.
     if not story.relevant:
         verdict = judge.relevant(story, relevance(conn, story.source_id))
         if not verdict.relevant:

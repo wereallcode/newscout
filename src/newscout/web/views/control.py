@@ -43,7 +43,7 @@ def index():
     now = datetime.now(UTC)
     midnight = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
     fetcher = db.fetcher.get(conn())
-    ai = state.active(conn())
+    ai = state.in_use(conn())
     counts = db.stories.counts(conn())
     return render_template(
         "control.html",
@@ -62,11 +62,7 @@ def index():
         fresh_minutes=int(db.settings.get(conn(), "fresh_minutes")),
         fresh_options=FRESH_OPTIONS,
         ai=ai,
-        key_state="ok"
-        if state.tested(conn())
-        else "problem"
-        if state.problem(conn())
-        else "unknown",
+        ai_health=state.health(conn()),
         language=instructions.language(conn()),
         custom_instructions=any(
             db.settings.get(conn(), f"ai_{step.key}") for step in instructions.STEPS

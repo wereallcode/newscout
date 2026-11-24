@@ -4,7 +4,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 
 from newscout import db, presets
 from newscout.ai import instructions, local, state
-from newscout.ai.deepseek import KeyCheck, check_key
+from newscout.ai.deepseek import check_key
 from newscout.web.database import conn
 from newscout.web.display import RAW_FILTERS
 
@@ -13,7 +13,6 @@ bp = Blueprint("settings", __name__)
 LIMITS = {"new_minutes": 1440, "trash_days": 365, "news_days": 365}
 DELETE_AGES = (1, 7, 30)
 
-# Each tab is one group of settings: key -> (label, icon). The first one opens by default.
 TABS = {
     "ai": ("AI", "sparkle"),
     "appearance": ("Appearance", "eye"),
@@ -44,12 +43,11 @@ def index():
         steps=instructions.STEPS,
         texts=instructions.load(conn()),
         languages=instructions.LANGUAGES,
-        api_keys=state.keys(conn()),
+        providers=state.providers(conn()),
         delete_ages=DELETE_AGES,
         labels={status: label for status, (label, _) in RAW_FILTERS.items() if status != "all"},
         counts=db.stories.counts(conn()),
-        key_tested=state.tested(conn()),
-        ai_problem=state.problem(conn()),
+        ai_health=state.health(conn()),
         servers=local.SERVERS,
         suggested=local.SUGGESTED,
     )
@@ -95,15 +93,8 @@ def save_instructions():
     return back("ai")
 
 
-def check(item: state.ApiKey) -> KeyCheck:
-    if item.local:
-        return local.check_model(item.url, item.model)
-    return check_key(item.value)
-
-
-# Adding checks the key or the local model first; what works becomes the AI.
-@bp.post("/settings/ai/keys")
-def add_key():
+@bp.post("/settings/ai/providers")
+def add_provider():
     if request.form.get("kind") == "local":
         return add_local()
     key = request.form.get("api_key", "").strip()
@@ -117,7 +108,7 @@ def add_key():
         try:
             state.add_key(conn(), key)
             flash(f"{result.message} It is now the key in use.", "ok")
-        except state.DuplicateKey:
+        except state.AlreadyAdded:
             flash("This key is already added.")
     return back("ai")
 
@@ -135,40 +126,40 @@ def add_local():
     try:
         state.add_local(conn(), url, model)
         flash(f"{result.message} It is now the model in use.", "ok")
-    except state.DuplicateKey:
+    except state.AlreadyAdded:
         flash("This model is already added.")
     return back("ai")
 
 
-def key_found(key_id: int) -> state.ApiKey:
-    item = state.get(conn(), key_id)
+def provider_found(provider_id: int) -> state.Provider:
+    item = state.provider(conn(), provider_id)
     if item is None:
         abort(404)
     return item
 
 
-@bp.post("/settings/ai/keys/<int:key_id>/use")
-def use_key(key_id: int):
-    result = check(key_found(key_id))
-    state.use_key(conn(), key_id, None if result.ok else result.message)
+@bp.post("/settings/ai/providers/<int:provider_id>/use")
+def use_provider(provider_id: int):
+    result = provider_found(provider_id).check()
+    state.use(conn(), provider_id, None if result.ok else result.message)
     flash(f"Switched. {result.message}", "ok" if result.ok else "")
     return back("ai")
 
 
-@bp.post("/settings/ai/keys/<int:key_id>/test")
-def test_key(key_id: int):
-    item = key_found(key_id)
-    result = check(item)
+@bp.post("/settings/ai/providers/<int:provider_id>/test")
+def test_provider(provider_id: int):
+    item = provider_found(provider_id)
+    result = item.check()
     if item.active:
         state.report(conn(), None if result.ok else result.message)
     flash(result.message, "ok" if result.ok else "")
     return back("ai")
 
 
-@bp.post("/settings/ai/keys/<int:key_id>/delete")
-def delete_key(key_id: int):
-    key_found(key_id)
-    state.remove_key(conn(), key_id)
+@bp.post("/settings/ai/providers/<int:provider_id>/delete")
+def delete_provider(provider_id: int):
+    provider_found(provider_id)
+    state.remove(conn(), provider_id)
     flash("Removed.", "ok")
     return back("ai")
 

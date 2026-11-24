@@ -12,7 +12,6 @@ PAUSE_AFTER_ERROR = timedelta(minutes=1)
 log = logging.getLogger(__name__)
 
 
-# Its own loop, so a slow AI never holds up fetching.
 def run_ai(path: Path, stop: threading.Event, poll: float = 2.0) -> None:
     conn = db.connect(path)
     paused_until = datetime.min.replace(tzinfo=UTC)

@@ -12,9 +12,7 @@ async function check() {
         data.new === 1 ? "1 new item arrived." : `${data.new} new items arrived.`;
       fresh.hidden = false;
     }
-  } catch {
-    // The page keeps working while the server is unreachable.
-  }
+  } catch {}
 }
 
 if (fresh) {

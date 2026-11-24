@@ -5,7 +5,6 @@ from datetime import datetime
 from newscout.db import core, sources
 from newscout.models import Entry, Story
 
-# Skipped and gone stories stay as bare rows only so the feed cannot bring them back.
 RAW_STATUSES = ("waiting", "kept", "merged", "dropped", "trash", "skipped", "gone")
 HIDDEN = ("skipped", "gone")
 
@@ -31,7 +30,6 @@ def save(
                 entry.summary,
                 core.to_text(entry.published_at),
                 core.to_text(now),
-                # A missing or future date would pin a story to the top, so cap it at fetch time.
                 core.to_text(min(entry.published_at or now, now)),
                 "skipped" if stale else "waiting",
                 None,
@@ -123,7 +121,6 @@ def mark_relevant(conn: sqlite3.Connection, story_id: int) -> None:
         conn.execute("UPDATE stories SET relevant = 1 WHERE id = ?", (story_id,))
 
 
-# You brought it back, so the AI skips the relevance check.
 def restore(conn: sqlite3.Connection, story_id: int) -> None:
     set_status(conn, story_id, "waiting")
     mark_relevant(conn, story_id)

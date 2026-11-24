@@ -61,7 +61,6 @@ def set_language(conn: sqlite3.Connection, value: str) -> None:
     db.settings.put(conn, "news_language", value if value in LANGUAGES else "")
 
 
-# The Language setting alone decides the language, so the Rewrite text never has to.
 def in_language(rewrite: str, language: str) -> str:
     if not language:
         return f"{rewrite}\nWrite the title and summary in the language of the sources."

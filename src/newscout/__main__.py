@@ -44,7 +44,6 @@ def main(argv: list[str] | None = None) -> int:
             run_forever(path, stop)
             return 0
         if args.command is None:
-            # Dev starts paused so a restart never surprises you; "newscout fetch" resumes as it was
             db.fetcher.stop(db.connect(path))
             state.set_running(db.connect(path), False)
             start(run_forever, path, stop)

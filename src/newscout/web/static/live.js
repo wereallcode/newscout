@@ -1,4 +1,3 @@
-// Swaps every [data-live] region with a fresh copy so the dashboard follows the fetcher.
 async function refresh() {
   try {
     const response = await fetch(location.href);
@@ -12,9 +11,7 @@ async function refresh() {
         fresh.classList.add("updated");
       }
     }
-  } catch {
-    // Keep the current view while the server is unreachable.
-  }
+  } catch {}
 }
 
 setInterval(refresh, 10000);

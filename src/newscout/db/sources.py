@@ -10,7 +10,6 @@ class DuplicateSource(Exception):
     pass
 
 
-# A source is fetched only while it and its group are both switched on.
 ACTIVE = "enabled = 1 AND group_id IN (SELECT id FROM groups WHERE enabled = 1)"
 
 

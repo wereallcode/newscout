@@ -84,7 +84,6 @@ def connect(path: Path) -> sqlite3.Connection:
     return conn
 
 
-# Columns added after a table was first created, so older databases get them too.
 LATER_COLUMNS = {
     "api_keys": {
         "kind": "TEXT NOT NULL DEFAULT 'deepseek'",
@@ -102,7 +101,6 @@ def _add_columns(conn: sqlite3.Connection) -> None:
 
 
 def to_text(value: datetime | None) -> str | None:
-    # Times are compared as text, so they must all be written in the same zone.
     return value.astimezone(UTC).isoformat() if value else None
 
 

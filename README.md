@@ -2,21 +2,39 @@
 
 A self-hosted newsroom that collects your RSS feeds and lets AI merge and rewrite them into one clean news list.
 
+## Preview
+
+<img src="docs/assets/newsroom.png" alt="Newsroom" width="700" />
+<img src="docs/assets/control-room.png" alt="Control Room" width="700" />
+
 ## Installation
 
 ### Requirements
 
-- `Python 3.12` through [uv](https://docs.astral.sh/uv/getting-started/installation/).
-- For the AI, either a [DeepSeek API key](https://platform.deepseek.com/api_keys) or a model running on your own machine in [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai). Choose one in Settings → AI → Provider.
+- [uv](https://docs.astral.sh/uv/getting-started/installation/), which installs `Python 3.12` for you.
+- Optionally, one of the supported AI providers below.
 
-### Quick Start
+### Supported AI
 
-Clone the repository and run Newscout.
+- [DeepSeek](https://platform.deepseek.com/api_keys)
+- [Ollama](https://ollama.com)
+- [LM Studio](https://lmstudio.ai)
+
+### Install
+
+Open a new terminal and follow these steps.
 
 ```bash
-git clone https://github.com/wereallcode/newscout.git
-cd newscout
-make dev
+git clone https://github.com/wereallcode/newscout.git && cd newscout
 ```
 
-Open http://127.0.0.1:8000 in your browser.
+```bash
+uv run newscout
+```
+
+Open the address the terminal prints, then add your AI provider in Settings → AI.
+
+## TODO
+
+- [ ] Add Docker support.
+- [ ] Add authentication support.

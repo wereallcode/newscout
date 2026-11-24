@@ -21,7 +21,6 @@ def strip_boilerplate(entry: Entry) -> Entry:
     return entry if summary == entry.summary else replace(entry, summary=summary)
 
 
-# A step returning None drops the story.
 STEPS: list[Step] = [strip_boilerplate]
 
 

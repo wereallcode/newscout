@@ -59,5 +59,4 @@ def get_interval(conn: sqlite3.Connection) -> int:
 def set_interval(conn: sqlite3.Connection, minutes: int) -> None:
     with conn:
         conn.execute("UPDATE fetcher SET interval_minutes = ? WHERE id = 1", (minutes,))
-        # Healthy sources pick up the new interval on the next poll; backing-off ones keep waiting.
         conn.execute("UPDATE sources SET next_due_at = NULL WHERE failures = 0")

@@ -7,13 +7,19 @@ import pytest
 
 from newscout import db
 from newscout.ai import instructions, local, loop, pipeline, similarity, state
-from newscout.ai.deepseek import DeepSeekJudge, KeyCheck, check_key
+from newscout.ai.chat import Check
+from newscout.ai.deepseek import DeepSeekJudge, check_key
 from newscout.ai.pipeline import Draft, Verdict
 from newscout.models import Entry
 
 NOW = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
 DRAFT = Draft("Clean title", "Clean summary")
 TEXTS = {"merge": "Same event only.", "rewrite": "Be brief."}
+
+
+def key_in_use(conn):
+    item = state.in_use(conn)
+    return item.value if item and not item.local else None
 
 
 @pytest.fixture
@@ -40,8 +46,6 @@ def news(conn, url, title, when=NOW):
 
 
 class Judge:
-    """Stands in for DeepSeek and records every question it gets."""
-
     def __init__(self, relevant=True, match=None, draft=DRAFT):
         self.answers = {"relevant": relevant, "match": match, "draft": draft}
         self.calls = []
@@ -203,7 +207,9 @@ def deepseek(content):
         seen.append((request.headers["authorization"], json.loads(request.content)))
         return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
 
-    client = lambda: httpx.Client(transport=httpx.MockTransport(handler))  # noqa: E731
+    def client():
+        return httpx.Client(transport=httpx.MockTransport(handler))
+
     return DeepSeekJudge("sk-test", client_factory=client), seen
 
 
@@ -257,7 +263,7 @@ def checker(status, body):
 def test_check_key_reports_the_balance():
     body = {"is_available": True, "balance_infos": [{"currency": "USD", "total_balance": "4.20"}]}
     result = check_key("sk-test", client_factory=checker(200, body))
-    assert result == KeyCheck(True, "Key works with a balance of 4.20 USD.")
+    assert result == Check(True, "Key works with a balance of 4.20 USD.")
 
 
 def test_check_key_with_an_empty_balance():
@@ -267,7 +273,7 @@ def test_check_key_with_an_empty_balance():
 
 
 def test_check_key_rejected():
-    assert check_key("sk-test", client_factory=checker(401, {})) == KeyCheck(
+    assert check_key("sk-test", client_factory=checker(401, {})) == Check(
         False, "DeepSeek rejected this key."
     )
 
@@ -284,7 +290,6 @@ def test_check_key_offline():
 
 
 def ai_once(path, monkeypatch, process):
-    """Runs run_ai for two polls with a fake pipeline."""
     stop = threading.Event()
     waits = []
     original_wait = stop.wait
@@ -388,14 +393,15 @@ def test_local_addresses_are_normalized(typed, url):
     assert local.normalize(typed) == url
 
 
-def test_checking_a_local_server_lists_its_models():
+def test_a_local_server_lists_its_models():
     client, _ = local_server(body={"data": [{"id": "qwen2.5"}, {"id": "llama3.1"}]})
-    server = local.check_server("http://localhost:11434/v1", client_factory=client)
-    assert server.ok and server.models == ("llama3.1", "qwen2.5")
-    client, _ = local_server(body={"data": []})
-    assert "no models" in local.check_server("http://x/v1", client_factory=client).message
+    assert local.models("http://localhost:11434/v1", client_factory=client) == [
+        "llama3.1",
+        "qwen2.5",
+    ]
     client, _ = local_server(status=404, body={})
-    assert not local.check_server("http://x/v1", client_factory=client).ok
+    with pytest.raises(local.Unreachable, match="answered 404"):
+        local.models("http://x/v1", client_factory=client)
 
     def down():
         def refuse(request):
@@ -403,8 +409,10 @@ def test_checking_a_local_server_lists_its_models():
 
         return httpx.Client(transport=httpx.MockTransport(refuse))
 
-    server = local.check_server("http://localhost:1234/v1", client_factory=down)
-    assert not server.ok and "Is Ollama or LM Studio running?" in server.message
+    result = local.check_model("http://localhost:1234/v1", "qwen2.5", client_factory=down)
+    assert not result.ok and "Is Ollama or LM Studio running?" in result.message
+    client, _ = local_server(body={"data": []})
+    assert "no models" in local.check_model("http://x/v1", "qwen2.5", client_factory=client).message
 
 
 def test_the_entry_in_use_decides_which_ai_writes(conn):
@@ -414,8 +422,8 @@ def test_the_entry_in_use_decides_which_ai_writes(conn):
     state.add_local(conn, "http://localhost:11434/v1", "llama3.1")
     judge = state.judge(conn)
     assert isinstance(judge, local.LocalJudge) and judge.model == "llama3.1"
-    assert state.key(conn) is None
-    [entry] = [item for item in state.keys(conn) if item.local]
+    assert key_in_use(conn) is None
+    [entry] = [item for item in state.providers(conn) if item.local]
     assert (entry.name, entry.hint) == ("llama3.1", "localhost:11434")
 
 
@@ -439,6 +447,6 @@ def test_older_databases_get_the_new_key_columns(tmp_path):
     old.commit()
     old.close()
     conn = db.connect(path)
-    [item] = state.keys(conn)
-    assert item.kind == "deepseek" and item.model == "" and item.hint == "1234"
+    [item] = state.providers(conn)
+    assert item.kind == "deepseek" and item.model == "" and item.hint == "…1234"
     conn.close()

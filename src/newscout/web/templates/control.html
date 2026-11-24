@@ -68,7 +68,7 @@
     </div>
     <div class="unit-row inline">
       <span>Provider</span>
-      <p class="unit-value">{% if ai %}{{ ai.name }} <span class="key-end">({{ '…' if not ai.local }}{{ ai.hint }})</span> <span class="state {{ key_state }}">{{ {'ok': 'Active', 'problem': 'Not Working', 'unknown': 'Not Tested'}[key_state] }}</span>{% else %}Not set up{% endif %}</p>
+      <p class="unit-value">{% if ai %}{{ ai.name }} <span class="key-end">({{ ai.hint }})</span> <span class="state {{ ai_health }}">{{ ai_health | health_label }}</span>{% else %}Not set up{% endif %}</p>
     </div>
     <div class="unit-row inline">
       <span>Writes News In</span>
