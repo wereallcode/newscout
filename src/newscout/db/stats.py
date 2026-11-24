@@ -50,13 +50,13 @@ def hourly(conn: sqlite3.Connection, now: datetime, hours: int = 24) -> list[int
     return counts
 
 
-def merged_since(conn: sqlite3.Connection, since: datetime) -> int:
-    row = conn.execute(
-        """SELECT COUNT(*) FROM events WHERE sort_at >= ? AND id IN
-           (SELECT event_id FROM stories GROUP BY event_id HAVING COUNT(*) > 1)""",
+def statuses_since(conn: sqlite3.Connection, since: datetime) -> dict[str, int]:
+    """How many raw stories fetched since then ended up in each status."""
+    rows = conn.execute(
+        "SELECT status, COUNT(*) FROM stories WHERE fetched_at >= ? GROUP BY status",
         (core.to_text(since),),
     )
-    return row.fetchone()[0]
+    return dict(rows.fetchall())
 
 
 def skipped_since(conn: sqlite3.Connection, since: datetime) -> int:

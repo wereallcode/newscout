@@ -2,22 +2,16 @@
 {% block title %}Control Room{% endblock %}
 {% from "_macros.html" import icon %}
 {% block content %}
-<div class="page-head">
-  <h1>Control Room</h1>
-  <p>The fetcher collects raw news from your sources and the AI turns it into news for your Newsroom.</p>
-</div>
-
 <section class="numbers" id="numbers" data-live>
   <div class="number wide">
-    <span>News today</span>
+    <span>News Today</span>
     <b>{{ stats.today }}</b>
     {% set peak = hourly | max %}
-    <div class="spark" aria-hidden="true">{% for count in hourly %}<i style="height: {{ (count / peak * 100) if peak else 0 }}%" title="{{ count }}"></i>{% endfor %}</div>
+    <div class="spark {{ 'flat' if not peak }}" aria-hidden="true">{% for count in hourly %}<i style="height: {{ (count / peak * 100) if peak else 0 }}%" title="{{ count }}"></i>{% endfor %}</div>
   </div>
-  <div class="number"><span>Last hour</span><b>{{ last_hour }}</b></div>
-  <div class="number"><span>Merged today</span><b>{{ merged_today }}</b></div>
-  <div class="number"><span>Skipped as old</span><b>{{ skipped_today }}</b></div>
-  <a class="number {{ 'alert' if stats.failing_sources }}" href="{{ url_for('sources.index') }}"><span>Sources working</span><b>{{ stats.active_sources - stats.failing_sources }}<small>/{{ total_sources }}</small></b></a>
+  <div class="number"><span>Last Hour</span><b>{{ last_hour }}</b></div>
+  <div class="number"><span>Skipped as Old</span><b>{{ skipped_today }}</b></div>
+  <a class="number" href="{{ url_for('sources.index') }}"><span>Sources On</span><b>{{ stats.active_sources }}<small>/{{ total_sources }}</small>{% if stats.failing_sources %}<em class="group-badge error">{{ stats.failing_sources }} failing</em>{% endif %}</b></a>
 </section>
 
 <div class="units" id="units" data-live>
@@ -26,30 +20,32 @@
       <span class="unit-icon"><svg viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg></span>
       <div class="unit-title">
         <h2>Fetcher <span class="state">{{ status | status_label }}</span></h2>
-        <p>{% if status == 'running' %}Next check {{ next_due | when }}{% elif status == 'stopped' %}Start it to collect news from your sources.{% else %}It stopped unexpectedly, so restart Newscout.{% endif %}</p>
+        <p>{% if status == 'running' %}Next check {{ next_due | when }}{% elif status == 'stopped' %}Start it to collect news from your sources.{% else %}Start Newscout with <code>uv run newscout</code> to run it.{% endif %}</p>
       </div>
+      {% if status != 'not responding' %}
       <form method="post" action="{{ url_for('control.stop_fetcher' if state.running else 'control.start_fetcher') }}">
         <button class="{{ 'ghost' if state.running else 'primary' }}" type="submit">{% if state.running %}<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>Pause{% else %}<svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg>Start{% endif %}</button>
       </form>
+      {% endif %}
     </div>
     <div class="unit-row">
-      <span>Groups to fetch</span>
-      <div class="chips">
-        {% for group in groups %}<form method="post" action="{{ url_for('control.toggle_group', group_id=group.id) }}"><button class="chip-option {{ 'on' if group.enabled }}" type="submit" title="{{ 'Stop fetching' if group.enabled else 'Fetch' }} {{ group.name }}">{{ group.name }} <small>{{ group.sources | length }}</small></button></form>
-        {% else %}<a class="chip-option" href="{{ url_for('sources.index') }}">Add sources first</a>{% endfor %}
+      <span>Groups to Fetch</span>
+      <div class="group-switches">
+        {% for group in groups %}<form method="post" action="{{ url_for('control.toggle_group', group_id=group.id) }}"><button class="group-switch {{ 'on' if group.enabled }}" type="submit" aria-pressed="{{ 'true' if group.enabled else 'false' }}" title="{{ 'Stop fetching' if group.enabled else 'Fetch' }} {{ group.name }}"><span class="box">{{ icon('check') }}</span>{{ group.name }} <small>{{ group.sources | length }}</small></button></form>
+        {% else %}<a class="group-switch" href="{{ url_for('sources.index') }}">{{ icon('plus') }}Add Sources First</a>{% endfor %}
       </div>
     </div>
     <form class="unit-row" method="post" action="{{ url_for('control.freshness') }}">
-      <span>Collect news from the last</span>
+      <span>Collect News from the Last</span>
       <div class="chips">{% for minutes, label in fresh_options %}<button class="chip-option {{ 'on' if minutes == fresh_minutes }}" type="submit" name="fresh_minutes" value="{{ minutes }}">{{ label }}</button>{% endfor %}</div>
     </form>
     <form class="unit-row" method="post" action="{{ url_for('control.interval') }}">
-      <span>Check every</span>
+      <span>Check Every</span>
       <div class="chips">{% for minutes in intervals %}<button class="chip-option {{ 'on' if minutes == interval }}" type="submit" name="interval" value="{{ minutes }}">{{ minutes }} min</button>{% endfor %}</div>
     </form>
     <div class="unit-foot">
-      <span class="when"><span title="Last check">{{ icon('clock') }}{{ state.last_pass_at | ago }}</span>{% if state.last_pass_at %}<span title="Added in the last check">{{ icon('plus') }}{{ state.last_pass_added }}</span>{% endif %}</span>
-      <form method="post" action="{{ url_for('control.check_now') }}"><button class="link-button" type="submit" {{ 'disabled' if not state.running }}>{{ icon('refresh') }}Check now</button></form>
+      <span class="last-check">{{ icon('clock') }}{% if state.last_pass_at %}Last check {{ state.last_pass_at | ago }}{{ ' ago' if state.last_pass_at | ago != 'now' }} · {{ state.last_pass_added }} added{% else %}Not checked yet{% endif %}</span>
+      <form method="post" action="{{ url_for('control.check_now') }}"><button class="link-button" type="submit" {{ 'disabled' if not state.running }}>{{ icon('refresh') }}Check Now</button></form>
     </div>
   </section>
 
@@ -66,20 +62,24 @@
       </form>
       {% endif %}
     </div>
-    <div class="unit-row">
-      <span>API key</span>
-      <p class="unit-value">{% if key_hint %}DeepSeek <code>…{{ key_hint }}</code> <span class="state {{ key_state }}">{{ {'ok': 'Active', 'problem': 'Not working', 'unknown': 'Not tested'}[key_state] }}</span>{% else %}Not added{% endif %}</p>
+    <div class="unit-row inline">
+      <span>Today</span>
+      <p class="unit-value ai-today">{% for status, label in (('kept', 'News'), ('merged', 'Merged'), ('dropped', 'Dropped')) %}<span><b>{{ ai_today.get(status, 0) }}</b> {{ label }}</span>{% endfor %}</p>
     </div>
-    <div class="unit-row">
-      <span>Writes news in</span>
+    <div class="unit-row inline">
+      <span>API Key</span>
+      <p class="unit-value">{% if key_hint %}DeepSeek <span class="key-end">(…{{ key_hint }})</span> <span class="state {{ key_state }}">{{ {'ok': 'Active', 'problem': 'Not working', 'unknown': 'Not tested'}[key_state] }}</span>{% else %}Not added{% endif %}</p>
+    </div>
+    <div class="unit-row inline">
+      <span>Writes News in</span>
       <p class="unit-value">{{ language or 'Original language' }}</p>
     </div>
-    <div class="unit-row">
+    <div class="unit-row inline">
       <span>Instructions</span>
       <p class="unit-value">{{ 'Custom' if custom_instructions else 'Default' }}</p>
     </div>
     <div class="unit-foot">
-      <a href="{{ url_for('settings.index', tab='ai') }}">{{ icon('pencil') }}{{ 'Add DeepSeek key' if states.ai == 'off' else 'AI settings' }}</a>
+      <a href="{{ url_for('settings.index', tab='ai') }}">{{ icon('pencil') }}{{ 'Add DeepSeek Key' if states.ai == 'off' else 'AI Settings' }}</a>
     </div>
   </section>
 </div>

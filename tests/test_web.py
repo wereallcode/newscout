@@ -227,7 +227,7 @@ def test_stats_live_on_the_fetcher_page(client, conn):
     assert dashboard.count('class="story"') == 7
     assert 'data-count="newsroom">7<' in dashboard
     assert "data-stat" not in dashboard
-    assert "<span>Last hour</span><b>7</b>" in client.get("/control").text
+    assert "<span>Last Hour</span><b>7</b>" in client.get("/control").text
 
 
 def test_numbers_stay_with_their_event(client, conn):
@@ -364,12 +364,20 @@ def test_unknown_keys_are_not_found(client):
     assert client.post("/settings/ai/keys/99/delete").status_code == 404
 
 
-def test_failing_sources_are_not_counted_as_working(client, conn):
+def test_sources_on_counts_switched_on_sources_and_flags_failing_ones(client, conn):
     ok = db.sources.add(conn, "https://ok.example/feed")
     bad = db.sources.add(conn, "https://bad.example/feed")
     db.sources.record_success(conn, ok, NOW, NOW, None)
     db.sources.record_failure(conn, bad, NOW, NOW, "down")
-    assert "1<small>/2</small>" in client.get("/control").text
+    page = client.get("/control").text
+    assert "2<small>/2</small>" in page
+    assert "1 failing" in page
+
+
+def test_control_room_names_the_last_check_and_hides_pause_when_the_fetcher_is_down(client):
+    page = client.get("/control").text
+    assert "Not checked yet" in page
+    assert "control.stop_fetcher" not in page and "/fetcher/stop" not in page
 
 
 def test_retry_makes_a_failing_source_due_again(client, conn):
@@ -435,8 +443,11 @@ def test_first_run_guide_when_there_are_no_sources(client, conn):
     assert "Add a news source" not in client.get("/").text
 
 
-def test_merged_today_on_the_fetcher_page(client):
-    assert "Merged today" in client.get("/control").text
+def test_the_ai_card_shows_what_it_did_today(client):
+    page = client.get("/control").text
+    assert "<b>0</b> News" in page and "<b>0</b> Merged" in page and "<b>0</b> Dropped" in page
+    assert "Merged Today" not in page
+    assert "uv run newscout" in page
 
 
 def test_keep_settings(client, conn):
@@ -543,7 +554,7 @@ def test_skipped_count_on_the_fetcher_page(client, conn):
     source = db.sources.add(conn, "https://a.example/feed")
     old = Entry("o", "Old", "", "", datetime.now(UTC) - timedelta(days=2))
     db.stories.save(conn, source, [old], datetime.now(UTC), datetime.now(UTC) - timedelta(hours=1))
-    assert "<span>Skipped as old</span><b>1</b>" in client.get("/control").text
+    assert "<span>Skipped as Old</span><b>1</b>" in client.get("/control").text
 
 
 def test_two_tabs_without_roadmap_cards(client):
