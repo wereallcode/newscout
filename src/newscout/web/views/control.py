@@ -55,7 +55,7 @@ def index():
         last_hour=db.stats.count_since(conn(), now - timedelta(hours=1)),
         hourly=db.stats.hourly(conn(), now, hours=24),
         total_sources=len(db.sources.list_all(conn())),
-        merged_today=db.stats.merged_since(conn(), midnight),
+        ai_today=db.stats.statuses_since(conn(), midnight),
         skipped_today=db.stats.skipped_since(conn(), midnight),
         waiting=counts.get("waiting", 0),
         intervals=INTERVALS,

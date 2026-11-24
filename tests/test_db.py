@@ -208,15 +208,16 @@ def test_prune_forgets_news_after_the_keep_window(conn):
     assert len(stories(conn)) == 1
 
 
-def test_merged_today_counts_news_with_several_sources(conn):
+def test_statuses_since_count_what_the_ai_did_with_todays_stories(conn):
     a = db.sources.add(conn, "https://a.example/feed")
     b = db.sources.add(conn, "https://b.example/feed")
     kept(conn, a, "1")
-    assert db.stats.merged_since(conn, NOW - timedelta(hours=1)) == 0
-    db.stories.save(conn, b, [entry("2")], NOW)
-    (story,) = db.stories.waiting(conn, 10)
-    db.stories.attach(conn, story.id, db.news.list_page(conn)[0].id, "t", "s")
-    assert db.stats.merged_since(conn, NOW - timedelta(hours=1)) == 1
+    db.stories.save(conn, b, [entry("2"), entry("3")], NOW)
+    first, _ = db.stories.waiting(conn, 10)
+    db.stories.attach(conn, first.id, db.news.list_page(conn)[0].id, "t", "s")
+    since = NOW - timedelta(hours=1)
+    assert db.stats.statuses_since(conn, since) == {"kept": 1, "merged": 1, "waiting": 1}
+    assert db.stats.statuses_since(conn, NOW + timedelta(hours=1)) == {}
 
 
 def test_latest_ids_and_counts(conn):
