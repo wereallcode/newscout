@@ -2,6 +2,8 @@ import sqlite3
 from dataclasses import dataclass
 
 from newscout import db
+from newscout.ai.deepseek import DeepSeekJudge
+from newscout.ai.local import LocalJudge
 
 ACTIVE = "ai_active_key"
 RUNNING = "ai_running"
@@ -15,12 +17,37 @@ class DuplicateKey(Exception):
     pass
 
 
+# One way for the AI to write: a DeepSeek key, or a model on a local server.
 @dataclass(frozen=True)
 class ApiKey:
     id: int
-    hint: str
+    kind: str
+    value: str
+    model: str
     added_at: str
     active: bool
+
+    @property
+    def local(self) -> bool:
+        return self.kind == "local"
+
+    @property
+    def url(self) -> str:
+        return self.value.removesuffix(f"#{self.model}")
+
+    @property
+    def name(self) -> str:
+        return self.model if self.local else "DeepSeek"
+
+    @property
+    def hint(self) -> str:
+        """What tells entries apart: the server for a model, the last digits for a key."""
+        if self.local:
+            return self.url.removeprefix("http://").removesuffix("/v1")
+        return self.value[-4:]
+
+    def judge(self) -> DeepSeekJudge:
+        return LocalJudge(self.url, self.model) if self.local else DeepSeekJudge(self.value)
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -42,32 +69,41 @@ def _active_id(conn: sqlite3.Connection) -> int | None:
 def keys(conn: sqlite3.Connection) -> list[ApiKey]:
     _migrate(conn)
     active = _active_id(conn)
-    rows = conn.execute("SELECT id, value, added_at FROM api_keys ORDER BY id")
-    return [ApiKey(row[0], row[1][-4:], row[2][:10], row[0] == active) for row in rows]
+    rows = conn.execute("SELECT id, kind, value, model, added_at FROM api_keys ORDER BY id")
+    return [ApiKey(*row[:4], row[4][:10], row[0] == active) for row in rows]
 
 
-def value_of(conn: sqlite3.Connection, key_id: int) -> str | None:
-    row = conn.execute("SELECT value FROM api_keys WHERE id = ?", (key_id,)).fetchone()
-    return row[0] if row else None
+def get(conn: sqlite3.Connection, key_id: int) -> ApiKey | None:
+    return next((item for item in keys(conn) if item.id == key_id), None)
+
+
+def active(conn: sqlite3.Connection) -> ApiKey | None:
+    return next((item for item in keys(conn) if item.active), None)
 
 
 def key(conn: sqlite3.Connection) -> str | None:
-    _migrate(conn)
-    active = _active_id(conn)
-    return value_of(conn, active) if active else None
+    """The DeepSeek key in use, or None when the AI uses a local model."""
+    item = active(conn)
+    return item.value if item and not item.local else None
 
 
-# A new key has just passed its check, so it becomes the one the AI uses.
-def add_key(conn: sqlite3.Connection, value: str) -> int:
+# A new entry has just passed its check, so it becomes the one the AI uses.
+def add_key(conn: sqlite3.Connection, value: str, kind: str = "deepseek", model: str = "") -> int:
     _migrate(conn)
     try:
         with conn:
-            cursor = conn.execute("INSERT INTO api_keys (value) VALUES (?)", (value,))
+            cursor = conn.execute(
+                "INSERT INTO api_keys (value, kind, model) VALUES (?, ?, ?)", (value, kind, model)
+            )
     except sqlite3.IntegrityError as error:
         raise DuplicateKey from error
     use_key(conn, cursor.lastrowid, None)
     set_running(conn, True)
     return cursor.lastrowid
+
+
+def add_local(conn: sqlite3.Connection, url: str, model: str) -> int:
+    return add_key(conn, f"{url}#{model}", "local", model)
 
 
 def use_key(conn: sqlite3.Connection, key_id: int, problem: str | None) -> None:
@@ -107,3 +143,9 @@ def problem(conn: sqlite3.Connection) -> str | None:
 
 def tested(conn: sqlite3.Connection) -> bool:
     return db.settings.get(conn, STATUS) == "ok"
+
+
+def judge(conn: sqlite3.Connection) -> DeepSeekJudge | None:
+    """The AI that writes the news, or None until a key or a local model is added."""
+    item = active(conn)
+    return item.judge() if item else None

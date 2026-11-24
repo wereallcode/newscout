@@ -325,7 +325,7 @@ def test_several_keys_can_be_added_and_one_is_used(client, conn):
     assert f'action="/settings/ai/keys/{first.id}/use"' in page
     assert f'action="/settings/ai/keys/{second.id}/use"' not in page
     response = client.post(f"/settings/ai/keys/{first.id}/use", follow_redirects=True)
-    assert "Switched keys." in response.text
+    assert "Switched." in response.text
     assert state.key(conn) == "sk-first111" and state.tested(conn)
 
 
@@ -661,7 +661,7 @@ def test_top_bar_ai_state(client, conn):
 
 def test_control_room_says_when_ai_needs_a_key(client, conn):
     page = client.get("/control").text
-    assert "Add a DeepSeek key in Settings to start." in page
+    assert "Add a DeepSeek key or a local model in Settings to start." in page
     assert 'href="/settings?tab=ai"' in page and 'name="api_key"' not in page
     assert 'name="api_key"' in client.get("/settings?tab=ai").text
     db.settings.put(conn, "deepseek_api_key", "sk-x")
@@ -814,7 +814,7 @@ def test_settings_tabs_show_one_group_and_saving_returns_to_it(client, conn):
 
 def test_control_room_ai_card_summarises_the_ai_settings(client, conn):
     page = client.get("/control").text
-    assert "Not added" in page and "Original language" in page and ">Default<" in page
+    assert "Not set up" in page and "Original language" in page and ">Default<" in page
     db.settings.put(conn, "deepseek_api_key", "sk-abcd1234")
     db.settings.put(conn, "news_language", "Turkish")
     db.settings.put(conn, "ai_rewrite", "Be brief.")
@@ -866,3 +866,57 @@ def test_sources_import_refuses_a_file_without_feeds(client):
         follow_redirects=True,
     )
     assert "That file has no feeds in it" in response.text
+
+
+@pytest.fixture
+def local_server(monkeypatch):
+    """Ollama answers with two models; tests stand in for the network."""
+    from newscout.ai import local
+
+    def check(url, model):
+        if url != "http://localhost:11434/v1":
+            return KeyCheck(False, f"Nothing answered at {url}.")
+        if model not in ("llama3.1", "qwen2.5"):
+            return KeyCheck(False, f"{model} is not on that server. It has: llama3.1, qwen2.5.")
+        return KeyCheck(True, f"{model} is ready.")
+
+    monkeypatch.setattr(local, "check_model", check)
+
+
+def test_a_local_model_is_added_to_the_same_list_as_keys(client, conn, local_server):
+    client.post("/settings/ai/keys", data={"api_key": "sk-first111"})
+    page = client.get("/settings?tab=ai").text
+    assert "Ollama" in page and "LM Studio" in page and 'value="localhost:11434"' in page
+
+    data = {"kind": "local", "url": "localhost:11434", "model": "qwen2.5"}
+    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    assert "qwen2.5 is ready. It is now the model in use." in response.text
+    deepseek, model = state.keys(conn)
+    assert model.active and model.local and model.url == "http://localhost:11434/v1"
+    assert state.key(conn) is None and state.judge(conn).model == "qwen2.5"
+    control = client.get("/control").text
+    assert "qwen2.5" in control and "localhost:11434" in control
+
+    response = client.post(f"/settings/ai/keys/{deepseek.id}/use", follow_redirects=True)
+    assert "Switched." in response.text and state.key(conn) == "sk-first111"
+    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    assert "This model is already added." in response.text
+
+
+def test_a_local_model_that_cannot_answer_is_not_added(client, conn, local_server):
+    data = {"kind": "local", "url": "localhost:1234", "model": "qwen2.5"}
+    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    assert "Nothing answered at http://localhost:1234/v1." in response.text
+    data = {"kind": "local", "url": "localhost:11434", "model": "mistral"}
+    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    assert "mistral is not on that server. It has: llama3.1, qwen2.5." in response.text
+    assert state.keys(conn) == [] and state.judge(conn) is None
+
+
+def test_with_nothing_added_the_add_form_is_open(client, conn):
+    page = client.get("/settings?tab=ai").text
+    assert 'id="add-key" checked' in page and 'class="add-group"' not in page
+    assert 'title="Cancel"' not in page
+    client.post("/settings/ai/keys", data={"api_key": "sk-first111"})
+    page = client.get("/settings?tab=ai").text
+    assert 'id="add-key">' in page and 'class="add-group"' in page
