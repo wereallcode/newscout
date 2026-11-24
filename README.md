@@ -7,7 +7,7 @@ A self-hosted newsroom that collects your RSS feeds and lets AI merge and rewrit
 ### Requirements
 
 - `Python 3.12` through [uv](https://docs.astral.sh/uv/getting-started/installation/).
-- A [DeepSeek API key](https://platform.deepseek.com/api_keys) for the AI.
+- For the AI, either a [DeepSeek API key](https://platform.deepseek.com/api_keys) or a model running on your own machine in [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai). Choose one in Settings → AI → Provider.
 
 ### Quick Start
 

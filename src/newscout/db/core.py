@@ -52,7 +52,9 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS api_keys (
     id INTEGER PRIMARY KEY,
     value TEXT NOT NULL UNIQUE,
-    added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    kind TEXT NOT NULL DEFAULT 'deepseek',
+    model TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS fetcher (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -78,7 +80,25 @@ def connect(path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
+    _add_columns(conn)
     return conn
+
+
+# Columns added after a table was first created, so older databases get them too.
+LATER_COLUMNS = {
+    "api_keys": {
+        "kind": "TEXT NOT NULL DEFAULT 'deepseek'",
+        "model": "TEXT NOT NULL DEFAULT ''",
+    },
+}
+
+
+def _add_columns(conn: sqlite3.Connection) -> None:
+    for table, columns in LATER_COLUMNS.items():
+        have = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, definition in columns.items():
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
 
 def to_text(value: datetime | None) -> str | None:

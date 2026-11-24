@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from newscout import db
-from newscout.ai import instructions, loop, pipeline, similarity
+from newscout.ai import instructions, local, loop, pipeline, similarity, state
 from newscout.ai.deepseek import DeepSeekJudge, KeyCheck, check_key
 from newscout.ai.pipeline import Draft, Verdict
 from newscout.models import Entry
@@ -350,3 +350,95 @@ def test_the_language_setting_alone_decides_the_language():
     assert instructions.in_language(rewrite, "Turkish").endswith(
         "in Turkish, whatever language the sources use."
     )
+
+
+def local_server(status=200, body=None, content=None):
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        if request.url.path.endswith("/models"):
+            return httpx.Response(status, json=body)
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
+
+    return (lambda: httpx.Client(transport=httpx.MockTransport(handler))), seen
+
+
+def test_local_judge_asks_the_local_server_and_reads_json_from_chatty_models(conn):
+    story = raw(conn, "https://b.example/feed", "Ankara'da sağanak yağış")
+    reply = '<think>Hmm, weather.</think>\n```json\n{"relevant": false, "reason": "Weather"}\n```'
+    client, seen = local_server(content=reply)
+    judge = local.LocalJudge("http://localhost:11434/v1", "llama3.1", client_factory=client)
+    assert judge.relevant(story, "Only politics.") == Verdict(False, "Weather")
+    body = json.loads(seen[0].content)
+    assert str(seen[0].url) == "http://localhost:11434/v1/chat/completions"
+    assert body["model"] == "llama3.1" and "response_format" not in body
+
+
+@pytest.mark.parametrize(
+    ("typed", "url"),
+    [
+        ("localhost:11434", "http://localhost:11434/v1"),
+        ("http://localhost:1234/", "http://localhost:1234/v1"),
+        ("http://192.168.1.5:1234/v1", "http://192.168.1.5:1234/v1"),
+        ("  ", ""),
+    ],
+)
+def test_local_addresses_are_normalized(typed, url):
+    assert local.normalize(typed) == url
+
+
+def test_checking_a_local_server_lists_its_models():
+    client, _ = local_server(body={"data": [{"id": "qwen2.5"}, {"id": "llama3.1"}]})
+    server = local.check_server("http://localhost:11434/v1", client_factory=client)
+    assert server.ok and server.models == ("llama3.1", "qwen2.5")
+    client, _ = local_server(body={"data": []})
+    assert "no models" in local.check_server("http://x/v1", client_factory=client).message
+    client, _ = local_server(status=404, body={})
+    assert not local.check_server("http://x/v1", client_factory=client).ok
+
+    def down():
+        def refuse(request):
+            raise httpx.ConnectError("refused")
+
+        return httpx.Client(transport=httpx.MockTransport(refuse))
+
+    server = local.check_server("http://localhost:1234/v1", client_factory=down)
+    assert not server.ok and "Is Ollama or LM Studio running?" in server.message
+
+
+def test_the_entry_in_use_decides_which_ai_writes(conn):
+    assert state.judge(conn) is None
+    state.add_key(conn, "sk-test1234")
+    assert isinstance(state.judge(conn), DeepSeekJudge)
+    state.add_local(conn, "http://localhost:11434/v1", "llama3.1")
+    judge = state.judge(conn)
+    assert isinstance(judge, local.LocalJudge) and judge.model == "llama3.1"
+    assert state.key(conn) is None
+    [entry] = [item for item in state.keys(conn) if item.local]
+    assert (entry.name, entry.hint) == ("llama3.1", "localhost:11434")
+
+
+def test_checking_a_model_says_which_ones_the_server_has():
+    client, _ = local_server(body={"data": [{"id": "qwen2.5"}]})
+    assert local.check_model("http://x/v1", "qwen2.5", client_factory=client).ok
+    result = local.check_model("http://x/v1", "llama3.1", client_factory=client)
+    assert result.message == "llama3.1 is not on that server. It has: qwen2.5."
+
+
+def test_older_databases_get_the_new_key_columns(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.execute(
+        "CREATE TABLE api_keys (id INTEGER PRIMARY KEY, value TEXT NOT NULL UNIQUE,"
+        " added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+    )
+    old.execute("INSERT INTO api_keys (value) VALUES ('sk-old1234')")
+    old.commit()
+    old.close()
+    conn = db.connect(path)
+    [item] = state.keys(conn)
+    assert item.kind == "deepseek" and item.model == "" and item.hint == "1234"
+    conn.close()

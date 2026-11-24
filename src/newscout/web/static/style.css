@@ -223,14 +223,6 @@ main { padding-top: 32px; padding-bottom: 72px; }
 
 .ghost.spacer { visibility: hidden; }
 
-.key-field.add-key-form { display: none; margin-top: 8px; }
-
-#add-key:checked ~ .key-box .key-field.add-key-form { display: flex; }
-
-#add-key:checked ~ .settings-section .section-add { color: var(--text); background: rgba(18, 17, 39, 0.12); }
-
-#add-key:focus-visible ~ .settings-section .section-add { outline: 4px solid var(--accent-soft); }
-
 .section-add { display: grid; place-items: center; width: 26px; height: 26px; margin-left: auto; border-radius: 8px; color: var(--muted); background: rgba(18, 17, 39, 0.06); cursor: pointer; }
 
 .section-add:hover { color: var(--text); background: rgba(18, 17, 39, 0.12); }
@@ -247,9 +239,26 @@ main { padding-top: 32px; padding-bottom: 72px; }
 
 .key-box { position: relative; }
 
-.key-add { display: grid; gap: 10px; margin: 0; color: var(--muted); font-size: 13px; }
+/* Adding opens under the list: pick DeepSeek or a local app, then fill in its form. */
+.add-ai { display: none; padding: 16px 24px 18px; border-top: 1px solid var(--line-soft); }
 
-.key-add b { color: var(--text); }
+#add-key:checked ~ .add-ai { display: grid; gap: 10px; }
+
+#add-key:checked ~ .add-group { display: none; }
+
+.settings > .settings-section + .add-ai { border-top: 0; }
+
+.add-kinds { width: fit-content; }
+
+.add-ai .add-form { display: none; }
+
+.add-form .server { flex: 0 1 170px; }
+
+#add-deepseek:checked ~ .add-deepseek, #add-1:checked ~ .add-1, #add-2:checked ~ .add-2 { display: flex; }
+
+#add-deepseek:checked ~ .add-kinds [for="add-deepseek"], #add-1:checked ~ .add-kinds [for="add-1"], #add-2:checked ~ .add-kinds [for="add-2"] { color: var(--text); background: #fff; box-shadow: 0 1px 3px rgba(18, 17, 39, 0.12); }
+
+.add-ai > .toggle:focus-visible ~ .add-kinds { outline: 4px solid var(--accent-soft); }
 
 .primary svg { fill: currentColor; }
 
@@ -1164,7 +1173,17 @@ a.url:hover { color: var(--accent); }
 
   .key-status > form button { width: 100%; }
 
-  .key-status > form:last-child, .key-status > .ghost.spacer { flex: none; }
+  .key-status > form:last-child { flex: none; }
+
+  .key-status > .ghost.spacer { display: none; }
+
+  .key-status .ghost { min-width: 0; padding: 7px 6px; }
+
+  .add-ai { padding: 14px 16px 16px; }
+
+  .add-ai .add-form { flex-wrap: wrap; }
+
+  .add-form .server { flex: 1 1 100%; }
 
   .key-details { padding-left: 14px; }
 
@@ -1208,6 +1227,8 @@ a.url:hover { color: var(--accent); }
   .setting > .field { flex: none; padding: 0 12px; }
 
   .chip-option { min-height: 38px; }
+
+  .key-field > .ghost, .key-field > .save { flex: none; }
 
   .story-actions .chip-button { min-width: 40px; min-height: 40px; justify-content: center; }
 }

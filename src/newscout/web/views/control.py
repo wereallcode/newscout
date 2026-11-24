@@ -21,7 +21,7 @@ def fetcher_status(state: FetcherState, now: datetime) -> str:
 
 
 def ai_status() -> str:
-    if not state.key(conn()):
+    if not state.judge(conn()):
         return "off"
     if not state.running(conn()):
         return "paused"
@@ -43,7 +43,7 @@ def index():
     now = datetime.now(UTC)
     midnight = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
     fetcher = db.fetcher.get(conn())
-    key = state.key(conn())
+    ai = state.active(conn())
     counts = db.stories.counts(conn())
     return render_template(
         "control.html",
@@ -61,7 +61,7 @@ def index():
         intervals=INTERVALS,
         fresh_minutes=int(db.settings.get(conn(), "fresh_minutes")),
         fresh_options=FRESH_OPTIONS,
-        key_hint=key[-4:] if key else None,
+        ai=ai,
         key_state="ok"
         if state.tested(conn())
         else "problem"

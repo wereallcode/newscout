@@ -3,8 +3,8 @@ from datetime import UTC, datetime, timedelta
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from newscout import db, presets
-from newscout.ai import instructions, state
-from newscout.ai.deepseek import check_key
+from newscout.ai import instructions, local, state
+from newscout.ai.deepseek import KeyCheck, check_key
 from newscout.web.database import conn
 from newscout.web.display import RAW_FILTERS
 
@@ -50,6 +50,8 @@ def index():
         counts=db.stories.counts(conn()),
         key_tested=state.tested(conn()),
         ai_problem=state.problem(conn()),
+        servers=local.SERVERS,
+        suggested=local.SUGGESTED,
     )
 
 
@@ -93,8 +95,17 @@ def save_instructions():
     return back("ai")
 
 
+def check(item: state.ApiKey) -> KeyCheck:
+    if item.local:
+        return local.check_model(item.url, item.model)
+    return check_key(item.value)
+
+
+# Adding checks the key or the local model first; what works becomes the AI.
 @bp.post("/settings/ai/keys")
 def add_key():
+    if request.form.get("kind") == "local":
+        return add_local()
     key = request.form.get("api_key", "").strip()
     if key and not key.startswith("sk-"):
         flash("That is not an API key: a DeepSeek key starts with sk-.")
@@ -111,25 +122,44 @@ def add_key():
     return back("ai")
 
 
-def key_found(key_id: int) -> str:
-    value = state.value_of(conn(), key_id)
-    if value is None:
+def add_local():
+    url = local.normalize(request.form.get("url", ""))
+    model = request.form.get("model", "").strip()
+    if not url or not model:
+        flash("Enter the server address and the model name.")
+        return back("ai")
+    result = local.check_model(url, model)
+    if not result.ok:
+        flash(result.message)
+        return back("ai")
+    try:
+        state.add_local(conn(), url, model)
+        flash(f"{result.message} It is now the model in use.", "ok")
+    except state.DuplicateKey:
+        flash("This model is already added.")
+    return back("ai")
+
+
+def key_found(key_id: int) -> state.ApiKey:
+    item = state.get(conn(), key_id)
+    if item is None:
         abort(404)
-    return value
+    return item
 
 
 @bp.post("/settings/ai/keys/<int:key_id>/use")
 def use_key(key_id: int):
-    result = check_key(key_found(key_id))
+    result = check(key_found(key_id))
     state.use_key(conn(), key_id, None if result.ok else result.message)
-    flash(f"Switched keys. {result.message}", "ok" if result.ok else "")
+    flash(f"Switched. {result.message}", "ok" if result.ok else "")
     return back("ai")
 
 
 @bp.post("/settings/ai/keys/<int:key_id>/test")
 def test_key(key_id: int):
-    result = check_key(key_found(key_id))
-    if state.key(conn()) == key_found(key_id):
+    item = key_found(key_id)
+    result = check(item)
+    if item.active:
         state.report(conn(), None if result.ok else result.message)
     flash(result.message, "ok" if result.ok else "")
     return back("ai")
@@ -139,7 +169,7 @@ def test_key(key_id: int):
 def delete_key(key_id: int):
     key_found(key_id)
     state.remove_key(conn(), key_id)
-    flash("Key removed.", "ok")
+    flash("Removed.", "ok")
     return back("ai")
 
 

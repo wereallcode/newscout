@@ -1,4 +1,5 @@
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -31,7 +32,22 @@ def _story(story: Story) -> dict[str, str]:
     return {"title": story.title, "summary": story.summary, "source": story.source_name}
 
 
+# Strips what local models wrap around their JSON: a reasoning block or a code fence.
+def _json_in(content: str) -> Any:
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.S).strip()
+    start, end = content.find("{"), content.rfind("}")
+    if start != -1 and end > start:
+        content = content[start : end + 1]
+    return json.loads(content)
+
+
 class DeepSeekJudge:
+    name = "DeepSeek"
+    base_url = URL
+    model = "deepseek-chat"
+    # DeepSeek can be told to answer in JSON; local servers differ, so they are only asked.
+    json_mode = True
+
     def __init__(
         self,
         api_key: str,
@@ -44,7 +60,7 @@ class DeepSeekJudge:
     def relevant(self, story: Story, instructions: str) -> Verdict:
         answer = self._ask(RELEVANCE + instructions, _story(story))
         if not isinstance(answer.get("relevant"), bool):
-            raise ValueError(f"Unexpected answer from DeepSeek: {answer}")
+            raise ValueError(f"Unexpected answer from {self.name}: {answer}")
         return Verdict(answer["relevant"], answer.get("reason") or None)
 
     def match(self, story: Story, candidates: list[Event], instructions: str) -> int | None:
@@ -52,38 +68,40 @@ class DeepSeekJudge:
         answer = self._ask(MERGE + instructions, {"raw": _story(story), "candidates": options})
         match = answer.get("match")
         if match is not None and not isinstance(match, int):
-            raise ValueError(f"Unexpected answer from DeepSeek: {answer}")
+            raise ValueError(f"Unexpected answer from {self.name}: {answer}")
         return match
 
     def rewrite(self, stories: list[Story], instructions: str) -> Draft:
         answer = self._ask(REWRITE + instructions, {"sources": [_story(s) for s in stories]})
         title, summary = answer.get("title"), answer.get("summary")
         if not isinstance(title, str) or not title.strip() or not isinstance(summary, str):
-            raise ValueError(f"Unexpected answer from DeepSeek: {answer}")
+            raise ValueError(f"Unexpected answer from {self.name}: {answer}")
         return Draft(title.strip(), summary.strip())
 
     def _ask(self, system: str, payload: dict[str, Any]) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "model": self.model,
+            "temperature": 0,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+        }
+        if self.json_mode:
+            body["response_format"] = {"type": "json_object"}
         with self.client_factory() as client:
             response = client.post(
-                f"{URL}/chat/completions",
+                f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
-                json={
-                    "model": "deepseek-chat",
-                    "temperature": 0,
-                    "response_format": {"type": "json_object"},
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-                    ],
-                },
+                json=body,
             )
             response.raise_for_status()
         try:
-            answer = json.loads(response.json()["choices"][0]["message"]["content"])
+            answer = _json_in(response.json()["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError, json.JSONDecodeError) as error:
-            raise ValueError(f"Unexpected answer from DeepSeek: {error}") from error
+            raise ValueError(f"Unexpected answer from {self.name}: {error}") from error
         if not isinstance(answer, dict):
-            raise ValueError(f"Unexpected answer from DeepSeek: {answer}")
+            raise ValueError(f"Unexpected answer from {self.name}: {answer}")
         return answer
 
 

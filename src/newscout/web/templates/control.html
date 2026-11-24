@@ -54,9 +54,9 @@
       <span class="unit-icon"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></span>
       <div class="unit-title">
         <h2>AI <span class="state">{{ {'off': 'Off', 'paused': 'Paused', 'on': 'Running', 'problem': 'Problem'}[states.ai] }}</span></h2>
-        <p>{% if states.ai == 'off' %}Add a DeepSeek key in Settings to start.{% elif states.ai == 'problem' %}{{ ai_problem }}{% else %}{{ waiting }} raw {{ 'story' if waiting == 1 else 'stories' }} waiting.{% endif %}</p>
+        <p>{% if states.ai == 'off' %}Add a DeepSeek key or a local model in Settings to start.{% elif states.ai == 'problem' %}{{ ai_problem }}{% else %}{{ waiting }} raw {{ 'story' if waiting == 1 else 'stories' }} waiting.{% endif %}</p>
       </div>
-      {% if key_hint %}
+      {% if ai %}
       <form method="post" action="{{ url_for('control.stop_ai' if states.ai in ('on', 'problem') else 'control.start_ai') }}">
         <button class="{{ 'ghost' if states.ai in ('on', 'problem') else 'primary' }}" type="submit">{% if states.ai in ('on', 'problem') %}<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>Pause{% else %}<svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg>Start{% endif %}</button>
       </form>
@@ -67,8 +67,8 @@
       <p class="unit-value ai-today">{% for status, label in (('kept', 'News'), ('merged', 'Merged'), ('dropped', 'Dropped')) %}<span><b>{{ ai_today.get(status, 0) }}</b> {{ label }}</span>{% endfor %}</p>
     </div>
     <div class="unit-row inline">
-      <span>API Key</span>
-      <p class="unit-value">{% if key_hint %}DeepSeek <span class="key-end">(…{{ key_hint }})</span> <span class="state {{ key_state }}">{{ {'ok': 'Active', 'problem': 'Not Working', 'unknown': 'Not Tested'}[key_state] }}</span>{% else %}Not added{% endif %}</p>
+      <span>Provider</span>
+      <p class="unit-value">{% if ai %}{{ ai.name }} <span class="key-end">({{ '…' if not ai.local }}{{ ai.hint }})</span> <span class="state {{ key_state }}">{{ {'ok': 'Active', 'problem': 'Not Working', 'unknown': 'Not Tested'}[key_state] }}</span>{% else %}Not set up{% endif %}</p>
     </div>
     <div class="unit-row inline">
       <span>Writes News In</span>
@@ -79,7 +79,7 @@
       <p class="unit-value">{{ 'Custom' if custom_instructions else 'Default' }}</p>
     </div>
     <div class="unit-foot">
-      <a href="{{ url_for('settings.index', tab='ai') }}">{{ icon('pencil') }}{{ 'Add DeepSeek Key' if states.ai == 'off' else 'AI Settings' }}</a>
+      <a href="{{ url_for('settings.index', tab='ai') }}">{{ icon('pencil') }}{{ 'Set Up the AI' if states.ai == 'off' else 'AI Settings' }}</a>
     </div>
   </section>
 </div>
