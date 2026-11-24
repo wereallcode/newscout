@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
-STATUS_LABELS = {"running": "Running", "stopped": "Paused", "not responding": "Not working"}
+STATUS_LABELS = {"running": "Running", "stopped": "Paused", "not responding": "Not Working"}
 SOURCE_LABELS = {"ok": "Working", "error": "Problem", "pending": "Waiting"}
 RAW_FILTERS = {
     "all": ("All", ("waiting", "kept", "merged", "dropped", "trash")),
