@@ -7,7 +7,7 @@
     <span>News Today</span>
     <b>{{ stats.today }}</b>
     {% set peak = hourly | max %}
-    <div class="spark {{ 'flat' if not peak }}" aria-hidden="true">{% for count in hourly %}<i style="height: {{ (count / peak * 100) if peak else 0 }}%" title="{{ count }}"></i>{% endfor %}</div>
+    <div class="spark {{ 'flat' if not peak }}" aria-hidden="true">{% for count in hourly %}<i class="{{ 'zero' if not count }}" style="height: {{ (count / peak * 100) if peak else 0 }}%" title="{{ count }}"></i>{% endfor %}</div>
   </div>
   <div class="number"><span>Last Hour</span><b>{{ last_hour }}</b></div>
   <div class="number"><span>Skipped as Old</span><b>{{ skipped_today }}</b></div>

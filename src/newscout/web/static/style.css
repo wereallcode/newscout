@@ -869,7 +869,7 @@ a.number:hover { border-color: var(--accent); }
 
 .number em { margin-left: 8px; font-style: normal; letter-spacing: 0; vertical-align: middle; white-space: nowrap; }
 
-.spark.flat i { background: var(--line-soft); }
+.spark.flat i, .spark i.zero { background: var(--line-soft); }
 
 .last-check { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -954,6 +954,8 @@ a.group-switch svg { width: 14px; height: 14px; }
   .numbers { grid-template-columns: 1fr 1fr; }
 
   .number.wide { grid-column: 1 / -1; }
+
+  .numbers > .number:last-child:nth-child(even) { grid-column: 1 / -1; }
 }
 
 
@@ -991,6 +993,10 @@ a.group-switch svg { width: 14px; height: 14px; }
 .group-head:hover b { color: var(--accent); }
 
 .group-head b { color: var(--text); font-size: 17px; font-weight: 800; }
+
+.group-title, .group-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+
+.group-meta > span { white-space: nowrap; }
 
 .group-head > svg { width: 16px; height: 16px; transition: transform 0.15s; }
 
@@ -1162,5 +1168,46 @@ a.url:hover { color: var(--accent); }
 
   .key-details { padding-left: 14px; }
 
-  .setting > .field { align-self: flex-start; }
+
+  .story { position: relative; gap: 12px; padding: 16px; }
+
+  .story-side .avatar { width: 32px; height: 32px; border-radius: 10px; font-size: 13px; }
+
+  .story-side .rank { display: none; }
+
+  .story:not(.raw) > .story-actions { position: absolute; top: 12px; right: 12px; }
+
+  .story:not(.raw) .story-body { padding-right: 36px; }
+
+  .source-link { font-size: 11px; }
+
+  .story.raw { flex-wrap: wrap; row-gap: 8px; }
+
+  .story.raw .story-body { flex: 1 1 calc(100% - 44px); }
+
+  .story.raw .raw-status { max-width: calc(100% - 100px); margin-left: 44px; }
+
+  .story.raw .story-actions .chip-button { gap: 0; padding: 7px 9px; font-size: 0; }
+
+  .story.raw .story-actions { margin-left: auto; }
+
+  .group-head { gap: 8px; padding: 14px 12px 14px 16px; }
+
+  .group-title { flex-direction: column; align-items: flex-start; gap: 4px; flex: 1; }
+
+  .group-head .group-edit-toggle { flex: none; width: 36px; height: 36px; }
+
+  .group-head .group-export { margin-left: 0; }
+
+  .setting > .chips { display: grid; grid-template-columns: repeat(3, 1fr); }
+
+  .setting > .chips .chip-option { justify-content: center; }
+
+  .presets .setting, .setting:has(> .field) { flex-direction: row; align-items: center; }
+
+  .setting > .field { flex: none; padding: 0 12px; }
+
+  .chip-option { min-height: 38px; }
+
+  .story-actions .chip-button { min-width: 40px; min-height: 40px; justify-content: center; }
 }
