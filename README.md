@@ -37,4 +37,3 @@ Open the address the terminal prints, then add your AI provider in Settings → 
 ## TODO
 
 - [ ] Add Docker support.
-- [ ] Add authentication support.

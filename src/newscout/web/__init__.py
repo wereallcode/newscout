@@ -1,13 +1,12 @@
 import os
-import secrets
 from pathlib import Path
 from urllib.parse import urlparse
 
 from flask import Flask, abort, request
 
-from newscout import db
+from newscout import auth, db
 from newscout.web import database, display
-from newscout.web.views import control, dashboard, settings, sources
+from newscout.web.views import control, dashboard, security, settings, sources
 
 
 def same_site_only() -> None:
@@ -16,10 +15,20 @@ def same_site_only() -> None:
         abort(403)
 
 
+def secret_key(path: Path) -> str:
+    conn = db.connect(path)
+    try:
+        return auth.secret(conn)
+    finally:
+        conn.close()
+
+
 def create_app(path: Path | None = None) -> Flask:
     app = Flask(__name__)
-    app.secret_key = os.environ.get("NEWSCOUT_SECRET") or secrets.token_hex(16)
     app.config["DATABASE"] = path or db.default_path()
+    app.secret_key = os.environ.get("NEWSCOUT_SECRET") or secret_key(app.config["DATABASE"])
+    app.config["SESSION_COOKIE_NAME"] = "newscout"
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
     app.jinja_env.filters.update(
         ago=display.ago,
@@ -31,7 +40,8 @@ def create_app(path: Path | None = None) -> Flask:
         health_label=display.HEALTH_LABELS.get,
     )
     app.before_request(same_site_only)
+    app.before_request(security.require_login)
     app.teardown_appcontext(database.close)
-    for view in (dashboard, control, settings, sources):
+    for view in (dashboard, control, settings, security, sources):
         app.register_blueprint(view.bp)
     return app
