@@ -31,9 +31,9 @@
       <div class="key-status {{ key_state }}">
         <span class="key-icon">{% if key_state == 'problem' %}<svg viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>{% elif item.active %}<svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>{% else %}{{ icon('key') }}{% endif %}</span>
         <span class="key-text"><b>DeepSeek <code class="key-hint">…{{ item.hint }}</code>{% if item.active %}<span class="state">{{ {'ok': 'Active', 'problem': 'Not Working', 'unknown': 'Not Tested'}[key_state] }}</span>{% endif %}</b></span>
-        {% if item.active %}{% if api_keys | length > 1 %}<span class="ghost spacer" aria-hidden="true">Use</span>{% endif %}{% else %}<form method="post" action="{{ url_for('settings.use_key', key_id=item.id) }}"><button class="ghost" type="submit">Use</button></form>{% endif %}
+        {% if item.active %}{% if api_keys | length > 1 %}<span class="ghost spacer" aria-hidden="true">Use</span>{% endif %}{% else %}<form method="post" action="{{ url_for('settings.use_key', key_id=item.id) }}"><button class="ghost" type="submit" data-busy="Checking…">Use</button></form>{% endif %}
         <label class="ghost" for="key-details-{{ item.id }}">Details</label>
-        <form method="post" action="{{ url_for('settings.test_key', key_id=item.id) }}"><button class="ghost" type="submit">Test</button></form>
+        <form method="post" action="{{ url_for('settings.test_key', key_id=item.id) }}"><button class="ghost" type="submit" data-busy="Testing…">Test</button></form>
         <form method="post" action="{{ url_for('settings.delete_key', key_id=item.id) }}" onsubmit="return confirm('Remove the key ending with {{ item.hint }}?')"><button class="ghost icon-only" type="submit" title="Remove key" aria-label="Remove key">{{ icon('trash') }}</button></form>
       </div>
       <p class="key-details">Added on {{ item.added_at }}, {% if not item.active %}not in use.{% elif key_state == 'ok' %}in use and working.{% elif key_state == 'problem' %}in use but not working.{% else %}in use but not tested yet.{% endif %}</p>
@@ -41,7 +41,7 @@
     {% endfor %}
     <form class="key-field add-key-form" method="post" action="{{ url_for('settings.add_key') }}">
       <input name="api_key" type="password" autocomplete="off" placeholder="sk-…" aria-label="New DeepSeek API key">
-      <button class="save" type="submit">Add</button>
+      <button class="save" type="submit" data-busy="Checking…">Add</button>
       <label class="ghost icon-only" for="add-key" title="Cancel" aria-label="Cancel">{{ icon('close') }}</label>
     </form>
     {% else %}
@@ -49,7 +49,7 @@
       <span><b>Add your DeepSeek key</b> to let the AI write your Newsroom.</span>
       <div class="key-field">
         <input name="api_key" type="password" autocomplete="off" placeholder="sk-…" aria-label="DeepSeek API key">
-        <button class="save" type="submit">Save</button>
+        <button class="save" type="submit" data-busy="Checking…">Save</button>
       </div>
     </form>
     {% endif %}

@@ -180,6 +180,13 @@ main { padding-top: 32px; padding-bottom: 72px; }
 
 .save.pop { animation: save-pop 0.4s ease-out; }
 
+/* A button that waits on DeepSeek shows a spinner until the page comes back. */
+.busy { pointer-events: none; opacity: 0.75; }
+
+.busy::before { content: ""; width: 12px; height: 12px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -2px; display: inline-block; animation: spin 0.7s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
 @keyframes save-pop {
   0% { transform: scale(0.9); }
   60% { transform: scale(1.06); }
@@ -192,7 +199,7 @@ main { padding-top: 32px; padding-bottom: 72px; }
 
 .key-box { padding: 18px 24px; }
 
-.toggle { position: absolute; opacity: 0; pointer-events: none; }
+.toggle { position: absolute; width: 0; height: 0; margin: 0; opacity: 0; pointer-events: none; }
 
 .key-item + .key-item { margin-top: 8px; }
 
@@ -491,6 +498,8 @@ a.title:hover { color: var(--accent); }
 
   nav a span { display: none; }
 
+  .brand { font-size: 0; gap: 0; }
+
   .primary, .ghost { flex: 1; }
 
   .setting { flex-direction: column; align-items: stretch; }
@@ -716,7 +725,9 @@ a.source-link:hover { border-color: var(--accent); color: var(--accent); }
   border-radius: 12px;
   background: #faf9fd;
   color: var(--text);
-  font: 14px/1.6 var(--mono);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
   resize: vertical;
 }
 
@@ -928,10 +939,21 @@ a.group-switch svg { width: 14px; height: 14px; }
 
 .switch.off .dot { background: #f59e0b; }
 
+/* When the menu no longer fits beside the switches it takes a row of its own. */
+@media (max-width: 980px) {
+  .bar-inner { flex-wrap: wrap; height: auto; padding-top: 12px; padding-bottom: 12px; row-gap: 10px; }
+
+  nav { order: 3; width: 100%; }
+
+  nav a { flex: 1; justify-content: center; }
+}
+
 @media (max-width: 860px) {
   .units { grid-template-columns: 1fr; }
 
   .numbers { grid-template-columns: 1fr 1fr; }
+
+  .number.wide { grid-column: 1 / -1; }
 }
 
 
@@ -1097,3 +1119,48 @@ a.url:hover { color: var(--accent); }
 .chip-option { white-space: nowrap; }
 
 .ghost.icon-only:hover { color: var(--error); }
+
+/* Last, so these phone sizes win over the page rules set above. */
+@media (max-width: 600px) {
+  .tabs-row { gap: 8px; }
+
+  .tabs-row .flow-step { flex: 1; min-width: 0; gap: 8px; padding: 10px; }
+
+  .tabs-row .flow-text h3 { font-size: 14px; }
+
+  .tabs-row .flow-icon { width: 32px; height: 32px; border-radius: 10px; }
+
+  .ai-arrow small { display: none; }
+
+  .add { flex-wrap: wrap; }
+
+  .add input { flex-basis: 100%; min-height: 48px; }
+
+  .add select { flex: 1; min-height: 48px; }
+
+  .add button { white-space: nowrap; }
+
+  .source { gap: 10px; padding: 14px 8px 14px 16px; }
+
+  .source .icon { width: 32px; }
+
+  .settings-tabs { display: flex; width: 100%; flex-wrap: nowrap; }
+
+  .settings-tabs .chip-option { flex: 1; justify-content: center; padding: 7px 4px; }
+
+  .settings-tabs .chip-option .ico { display: none; }
+
+  .key-status { flex-wrap: wrap; }
+
+  .key-text { flex: 1 1 calc(100% - 50px); }
+
+  .key-status > form, .key-status > label.ghost { flex: 1; }
+
+  .key-status > form button { width: 100%; }
+
+  .key-status > form:last-child, .key-status > .ghost.spacer { flex: none; }
+
+  .key-details { padding-left: 14px; }
+
+  .setting > .field { align-self: flex-start; }
+}

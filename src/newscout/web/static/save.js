@@ -21,6 +21,12 @@ function recall() {
 
 document.addEventListener("submit", (event) => {
   const button = event.submitter;
+  // Buttons that wait on the network say what they are doing until the page reloads.
+  if (button && button.dataset.busy && !event.defaultPrevented) {
+    button.classList.add("busy");
+    button.textContent = button.dataset.busy;
+    return;
+  }
   if (!button || !button.classList.contains("save")) return;
   button.classList.add("saved");
   remember(event.target.action);
@@ -43,3 +49,8 @@ if (pressed && document.querySelector(".flash.ok")) {
     break;
   }
 }
+
+// Coming back with the browser's Back button must not leave a button spinning.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted && document.querySelector(".busy")) location.reload();
+});
