@@ -89,7 +89,7 @@ def test_relevant_story_is_rewritten_into_news(conn):
     (event,) = db.news.list_page(conn)
     assert (event.title, event.summary) == ("Clean title", "Clean summary")
     assert steps(judge) == ["relevant", "rewrite"]
-    assert judge.calls[0][2] == "Only Ankara news." and judge.calls[1][2] == "Be brief."
+    assert judge.calls[0][2] == "Only Ankara news." and judge.calls[1][2].startswith("Be brief.\n")
     assert db.stories.counts(conn) == {"kept": 1}
 
 
@@ -341,3 +341,12 @@ def test_ai_failure_is_recorded_and_waits_a_minute(conn, path, monkeypatch):
     assert "401 Unauthorized" in db.settings.get(conn, "ai_status")
     ai_once(path, monkeypatch, lambda conn, judge, texts: 0)
     assert db.settings.get(conn, "ai_status") == "ok"
+
+
+def test_the_language_setting_alone_decides_the_language():
+    rewrite = next(step.default for step in instructions.STEPS if step.key == "rewrite")
+    assert "language" not in rewrite.lower()
+    assert instructions.in_language(rewrite, "").endswith("in the language of the sources.")
+    assert instructions.in_language(rewrite, "Turkish").endswith(
+        "in Turkish, whatever language the sources use."
+    )

@@ -27,10 +27,13 @@ STEPS = (
         "rewrite",
         "Rewrite",
         "Sets how headlines and descriptions are written.",
-        "Write a new headline: say plainly what happened, who did what and where.\n"
-        "No questions, no teasers, no exaggeration; the headline gives the news away.\n"
-        "Write a new description: one or two sentences with the key facts.\n"
-        "Write in the news' own language and in a neutral tone.",
+        "Write a headline that makes people want to read: open with the most striking fact,\n"
+        "use strong active verbs and concrete numbers, names and places.\n"
+        "The headline states the news: never a question, never a teaser.\n"
+        "Stay accurate: every claim must come from the sources, with their exact strength;\n"
+        "when the sources hedge (suspected, claims, could), the headline hedges too.\n"
+        "Write a one-sentence description with the key facts the headline left out;\n"
+        "add context or consequences only when the sources give them.",
     ),
 )
 
@@ -58,9 +61,10 @@ def set_language(conn: sqlite3.Connection, value: str) -> None:
     db.settings.put(conn, "news_language", value if value in LANGUAGES else "")
 
 
+# The Language setting alone decides the language, so the Rewrite text never has to.
 def in_language(rewrite: str, language: str) -> str:
     if not language:
-        return rewrite
+        return f"{rewrite}\nWrite the title and summary in the language of the sources."
     return (
         f"{rewrite}\nWrite the title and summary in {language}, whatever language the sources use."
     )
