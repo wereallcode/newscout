@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Sign In{% endblock %}
+{% block page %}
+<main class="login">
+  <div class="login-brand">
+    <span class="logo"><svg viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/></svg></span>
+    Newscout
+  </div>
+  <div class="login-panel">
+    <form class="login-form" method="post" action="{{ url_for('security.sign_in') }}">
+      {% for message in get_flashed_messages() %}<p class="flash">{{ message }}</p>{% endfor %}
+      <label for="password">Password</label>
+      <span class="login-field">{{ icon('lock') }}<input id="password" name="password" type="password" autocomplete="current-password" required autofocus></span>
+      <button class="primary" type="submit" data-busy="Signing In…">Sign In</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

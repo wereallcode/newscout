@@ -6,6 +6,9 @@
   {% for key, (label, icon_name) in tabs.items() %}
   <a class="chip-option {{ 'on' if key == tab }}" href="{{ url_for('settings.index', tab=key) }}"{% if key == tab %} aria-current="page"{% endif %}>{{ icon(icon_name) }}{{ label }}</a>
   {% endfor %}
+  {% if has_password %}
+  <form method="post" action="{{ url_for('security.sign_out') }}"><button class="chip-option sign-out" type="submit" title="Sign Out" aria-label="Sign Out">{{ icon('exit') }}<b>Sign Out</b></button></form>
+  {% endif %}
 </nav>
 
 {% if tab == 'appearance' %}
@@ -140,5 +143,37 @@
   </div>
   {% endfor %}
 </section>
+
+{% elif tab == 'auth' %}
+<form class="card settings" method="post" action="{{ url_for('security.save_password') }}">
+  <h2 class="settings-section">{{ icon('lock') }}Password</h2>
+  {% if has_password %}
+  <label class="setting">
+    <span><b>Current Password</b></span>
+    <span class="field password"><input name="current" type="password" autocomplete="current-password" placeholder="Current" required></span>
+  </label>
+  {% endif %}
+  <label class="setting">
+    <span><b>New Password</b></span>
+    <span class="field password"><input name="new" type="password" autocomplete="new-password" placeholder="New" minlength="{{ min_length }}" required></span>
+  </label>
+  <label class="setting">
+    <span><b>Repeat Password</b></span>
+    <span class="field password"><input name="repeat" type="password" autocomplete="new-password" placeholder="Repeat" minlength="{{ min_length }}" required></span>
+  </label>
+  <div class="settings-foot"><button class="save" type="submit">{{ 'Update' if has_password else 'Save' }}</button></div>
+</form>
+
+{% if has_password %}
+<section class="card settings">
+  <form class="setting" method="post" action="{{ url_for('security.remove_password') }}" onsubmit="return confirm('Remove the password and open Newscout to anyone who can reach it?')">
+    <span><b>Remove Password</b></span>
+    <div class="remove-password">
+      <span class="field password"><input name="current" type="password" autocomplete="current-password" placeholder="Current" aria-label="Current password" required></span>
+      <button class="danger-button" type="submit">Remove</button>
+    </div>
+  </form>
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}

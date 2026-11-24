@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
-from newscout import db, presets
+from newscout import auth, db, presets
 from newscout.ai import instructions, local, state
 from newscout.ai.deepseek import check_key
 from newscout.web.database import conn
@@ -18,6 +18,7 @@ TABS = {
     "appearance": ("Appearance", "eye"),
     "storage": ("Storage", "database"),
     "presets": ("Presets", "layers"),
+    "auth": ("Auth", "lock"),
 }
 
 
@@ -50,6 +51,8 @@ def index():
         ai_health=state.health(conn()),
         servers=local.SERVERS,
         suggested=local.SUGGESTED,
+        has_password=auth.enabled(conn()),
+        min_length=auth.MIN_LENGTH,
     )
 
 
