@@ -12,7 +12,6 @@ def clear_all(conn: sqlite3.Connection) -> None:
 
 
 def _forget(conn: sqlite3.Connection, where: str, params: tuple) -> int:
-    # Deleted stories keep a bare row so the feed cannot bring them back.
     hidden = ", ".join(f"'{status}'" for status in stories.HIDDEN)
     with conn:
         count = conn.execute(

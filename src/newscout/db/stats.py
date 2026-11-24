@@ -51,7 +51,6 @@ def hourly(conn: sqlite3.Connection, now: datetime, hours: int = 24) -> list[int
 
 
 def statuses_since(conn: sqlite3.Connection, since: datetime) -> dict[str, int]:
-    """How many raw stories fetched since then ended up in each status."""
     rows = conn.execute(
         "SELECT status, COUNT(*) FROM stories WHERE fetched_at >= ? GROUP BY status",
         (core.to_text(since),),

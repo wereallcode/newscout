@@ -20,7 +20,6 @@ def _unique_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return dict(pairs)
 
 
-# Every *.json file in this folder is one preset group.
 def load() -> tuple[Preset, ...]:
     paths = sorted(
         (path for path in files(__name__).iterdir() if path.name.endswith(".json")),
@@ -36,7 +35,6 @@ def load() -> tuple[Preset, ...]:
     names = [preset.name for preset in presets]
     if repeated := {name for name in names if names.count(name) > 1}:
         raise ValueError(f"presets repeat the name {sorted(repeated)}")
-    # A feed belongs to one group only, so a shared one would go missing from one.
     urls = [url for preset in presets for url in preset.sources]
     if repeated := {url for url in urls if urls.count(url) > 1}:
         raise ValueError(f"presets share the feeds {sorted(repeated)}")
@@ -46,12 +44,9 @@ def load() -> tuple[Preset, ...]:
 PRESETS = load()
 
 
-# Databases from before per-preset tracking stored "1" once these were installed.
 LEGACY_PRESETS = ("Turkish News", "Global Finance", "Gaming")
 
 
-# Old preset names. A group still under its old name takes the new one, so the
-# preset is not installed a second time with its sources already taken.
 RENAMED = {"Gaming": "Gaming News"}
 
 
@@ -83,8 +78,6 @@ def _create(conn: sqlite3.Connection, preset: Preset) -> bool:
     return True
 
 
-# Each preset is installed once, so a new preset shows up on the next run
-# while a preset group you delete stays deleted until you restore it.
 def install(conn: sqlite3.Connection) -> None:
     installed = _installed(conn)
     for preset in PRESETS:
@@ -94,9 +87,6 @@ def install(conn: sqlite3.Connection) -> None:
     db.settings.put(conn, "presets_installed", "\n".join(sorted(installed)))
 
 
-# Presets offered for restoring: no group has the name and some of the feeds are
-# gone. A group you renamed but kept the feeds of is not offered again, since
-# restoring it would only make an empty group.
 def missing(conn: sqlite3.Connection) -> list[Preset]:
     names = {group.name for group in db.groups.list_all(conn)}
     urls = {source.url for source in db.sources.list_all(conn)}

@@ -1,14 +1,10 @@
-// A Save button turns green when pressed, and again after the page reloads
-// if the server confirmed the save, so the feedback survives the redirect.
 const KEY = "newscout-saved";
 
 function remember(value) {
   try {
     if (value) sessionStorage.setItem(KEY, value);
     else sessionStorage.removeItem(KEY);
-  } catch {
-    // Without storage the button still turns green while the form submits.
-  }
+  } catch {}
 }
 
 function recall() {
@@ -21,7 +17,6 @@ function recall() {
 
 document.addEventListener("submit", (event) => {
   const button = event.submitter;
-  // Buttons that wait on the network say what they are doing until the page reloads.
   if (button && button.dataset.busy && !event.defaultPrevented) {
     button.classList.add("busy");
     button.textContent = button.dataset.busy;
@@ -50,7 +45,6 @@ if (pressed && document.querySelector(".flash.ok")) {
   }
 }
 
-// Coming back with the browser's Back button must not leave a button spinning.
 window.addEventListener("pageshow", (event) => {
   if (event.persisted && document.querySelector(".busy")) location.reload();
 });

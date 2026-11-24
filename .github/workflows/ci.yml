@@ -8,7 +8,6 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same branch or pull request cancels the run before it.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -20,10 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Caches uv downloads on pushes and pull requests (the default "auto").
       - uses: astral-sh/setup-uv@v10.4.0
 
-      # Fails when uv.lock is out of date with pyproject.toml.
       - name: Install
         run: uv sync --locked
 

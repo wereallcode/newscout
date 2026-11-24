@@ -48,7 +48,6 @@ def run_pass(
     if not sources:
         return None
     total = 0
-    # Not a context manager: leaving it would wait for a hung fetch.
     pool = ThreadPoolExecutor(max_workers=workers)
     jobs: dict[Future, Source] = {pool.submit(_fetch, s, collectors): s for s in sources}
     done, _ = wait(jobs, timeout=timeout)

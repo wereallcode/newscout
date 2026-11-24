@@ -4,11 +4,16 @@ import pytest
 
 from newscout import db, presets
 from newscout.ai import state
-from newscout.ai.deepseek import KeyCheck
+from newscout.ai.chat import Check
 from newscout.models import Entry
 from newscout.web import create_app
 
 NOW = datetime(2026, 11, 21, 12, 0, tzinfo=UTC)
+
+
+def key_in_use(conn):
+    item = state.in_use(conn)
+    return item.value if item and not item.local else None
 
 
 @pytest.fixture
@@ -29,7 +34,6 @@ def conn(path):
 
 
 def keep_all(conn):
-    """Stands in for the AI: every waiting story becomes news of its own."""
     for waiting in db.stories.waiting(conn, 1000):
         db.stories.keep(conn, waiting.id, waiting.title, waiting.summary)
 
@@ -281,87 +285,88 @@ def test_single_event_has_no_merged_badge(client, conn):
 
 @pytest.fixture(autouse=True)
 def key_check(monkeypatch):
-    """Keys are checked against DeepSeek when saved; tests answer instead of the network."""
-    results = {"sk-bad": KeyCheck(False, "DeepSeek rejected this key.")}
-    monkeypatch.setattr(
-        "newscout.web.views.settings.check_key",
-        lambda key: results.get(key, KeyCheck(True, "Key works with a balance of 4.20 USD.")),
-    )
+    results = {"sk-bad": Check(False, "DeepSeek rejected this key.")}
+
+    def check(key):
+        return results.get(key, Check(True, "Key works with a balance of 4.20 USD."))
+
+    monkeypatch.setattr("newscout.web.views.settings.check_key", check)
+    monkeypatch.setattr("newscout.ai.state.check_key", check)
 
 
 def test_api_key_is_saved_masked_and_removable(client, conn):
     response = client.post(
-        "/settings/ai/keys", data={"api_key": " sk-abcdef1234 "}, follow_redirects=True
+        "/settings/ai/providers", data={"api_key": " sk-abcdef1234 "}, follow_redirects=True
     )
     assert "Key works with a balance of 4.20 USD" in response.text
-    assert state.key(conn) == "sk-abcdef1234"
+    assert key_in_use(conn) == "sk-abcdef1234"
     page = client.get("/settings?tab=ai").text
     assert "sk-abcdef1234" not in page and "…1234" in page
     assert '<span class="state">Active</span>' in page
-    client.post(f"/settings/ai/keys/{state.keys(conn)[0].id}/delete")
-    assert state.key(conn) is None and state.keys(conn) == []
+    client.post(f"/settings/ai/providers/{state.providers(conn)[0].id}/delete")
+    assert key_in_use(conn) is None and state.providers(conn) == []
 
 
 def test_empty_api_key_keeps_the_saved_one(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-keep")
-    client.post("/settings/ai/keys", data={"api_key": ""})
-    assert state.key(conn) == "sk-keep"
+    client.post("/settings/ai/providers", data={"api_key": ""})
+    assert key_in_use(conn) == "sk-keep"
 
 
 def test_the_old_single_key_moves_into_the_key_list(conn):
     db.settings.put(conn, "deepseek_api_key", "sk-old1234")
-    [item] = state.keys(conn)
-    assert item.hint == "1234" and item.active
+    [item] = state.providers(conn)
+    assert item.hint == "…1234" and item.active
     assert db.settings.get(conn, "deepseek_api_key") is None
-    assert state.key(conn) == "sk-old1234"
+    assert key_in_use(conn) == "sk-old1234"
 
 
 def test_several_keys_can_be_added_and_one_is_used(client, conn):
-    client.post("/settings/ai/keys", data={"api_key": "sk-first111"})
-    client.post("/settings/ai/keys", data={"api_key": "sk-second22"})
-    first, second = state.keys(conn)
-    assert state.key(conn) == "sk-second22" and second.active and not first.active
+    client.post("/settings/ai/providers", data={"api_key": "sk-first111"})
+    client.post("/settings/ai/providers", data={"api_key": "sk-second22"})
+    first, second = state.providers(conn)
+    assert key_in_use(conn) == "sk-second22" and second.active and not first.active
     page = client.get("/settings?tab=ai").text
-    assert f'action="/settings/ai/keys/{first.id}/use"' in page
-    assert f'action="/settings/ai/keys/{second.id}/use"' not in page
-    response = client.post(f"/settings/ai/keys/{first.id}/use", follow_redirects=True)
+    assert f'action="/settings/ai/providers/{first.id}/use"' in page
+    assert f'action="/settings/ai/providers/{second.id}/use"' not in page
+    response = client.post(f"/settings/ai/providers/{first.id}/use", follow_redirects=True)
     assert "Switched." in response.text
-    assert state.key(conn) == "sk-first111" and state.tested(conn)
+    assert key_in_use(conn) == "sk-first111" and state.tested(conn)
 
 
 def test_switching_to_a_broken_key_reports_the_problem(client, conn):
-    client.post("/settings/ai/keys", data={"api_key": "sk-good111"})
+    client.post("/settings/ai/providers", data={"api_key": "sk-good111"})
     with conn:
         conn.execute("INSERT INTO api_keys (value) VALUES ('sk-bad')")
-    bad = next(k for k in state.keys(conn) if k.hint == "-bad")
-    client.post(f"/settings/ai/keys/{bad.id}/use")
-    assert state.key(conn) == "sk-bad"
+    bad = next(k for k in state.providers(conn) if k.hint == "…-bad")
+    client.post(f"/settings/ai/providers/{bad.id}/use")
+    assert key_in_use(conn) == "sk-bad"
     assert state.problem(conn) == "DeepSeek rejected this key."
 
 
 def test_a_key_cannot_be_added_twice(client, conn):
-    client.post("/settings/ai/keys", data={"api_key": "sk-same1234"})
+    client.post("/settings/ai/providers", data={"api_key": "sk-same1234"})
     response = client.post(
-        "/settings/ai/keys", data={"api_key": "sk-same1234"}, follow_redirects=True
+        "/settings/ai/providers", data={"api_key": "sk-same1234"}, follow_redirects=True
     )
     assert "This key is already added." in response.text
-    assert len(state.keys(conn)) == 1
+    assert len(state.providers(conn)) == 1
 
 
 def test_removing_the_key_in_use_hands_over_to_the_newest(client, conn):
     for value in ("sk-one11111", "sk-two22222", "sk-three333"):
-        client.post("/settings/ai/keys", data={"api_key": value})
-    one, two, three = state.keys(conn)
-    client.post(f"/settings/ai/keys/{one.id}/use")
-    client.post(f"/settings/ai/keys/{one.id}/delete")
-    assert state.key(conn) == "sk-three333" and not state.tested(conn)
-    client.post(f"/settings/ai/keys/{two.id}/delete")
-    assert state.key(conn) == "sk-three333"
+        client.post("/settings/ai/providers", data={"api_key": value})
+    one, two, three = state.providers(conn)
+    client.post(f"/settings/ai/providers/{one.id}/use")
+    client.post(f"/settings/ai/providers/{one.id}/delete")
+    assert key_in_use(conn) == "sk-three333" and not state.tested(conn)
+    client.post(f"/settings/ai/providers/{two.id}/delete")
+    assert key_in_use(conn) == "sk-three333"
 
 
 def test_unknown_keys_are_not_found(client):
-    assert client.post("/settings/ai/keys/99/use").status_code == 404
-    assert client.post("/settings/ai/keys/99/delete").status_code == 404
+    assert client.post("/settings/ai/providers/99/use").status_code == 404
+    assert client.post("/settings/ai/providers/99/delete").status_code == 404
 
 
 def test_sources_on_counts_switched_on_sources_and_flags_failing_ones(client, conn):
@@ -671,28 +676,32 @@ def test_control_room_says_when_ai_needs_a_key(client, conn):
 def test_a_new_key_clears_the_old_problem(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-old")
     db.settings.put(conn, "ai_status", "Problem: 401")
-    client.post("/settings/ai/keys", data={"api_key": "sk-new"})
+    client.post("/settings/ai/providers", data={"api_key": "sk-new"})
     assert db.settings.get(conn, "ai_status") == "ok"
     assert 'class="switch on"' in client.get("/").text
 
 
 def test_rejected_key_is_not_saved(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-keep")
-    response = client.post("/settings/ai/keys", data={"api_key": "sk-bad"}, follow_redirects=True)
+    response = client.post(
+        "/settings/ai/providers", data={"api_key": "sk-bad"}, follow_redirects=True
+    )
     assert "DeepSeek rejected this key." in response.text
-    assert state.key(conn) == "sk-keep" and len(state.keys(conn)) == 1
+    assert key_in_use(conn) == "sk-keep" and len(state.providers(conn)) == 1
 
 
 def test_key_without_sk_prefix_is_explained(client, conn):
-    response = client.post("/settings/ai/keys", data={"api_key": "f37abc"}, follow_redirects=True)
+    response = client.post(
+        "/settings/ai/providers", data={"api_key": "f37abc"}, follow_redirects=True
+    )
     assert "starts with sk-" in response.text
-    assert state.keys(conn) == []
+    assert state.providers(conn) == []
 
 
 def test_test_button_checks_the_saved_key(client, conn):
     db.settings.put(conn, "deepseek_api_key", "sk-bad")
-    [item] = state.keys(conn)
-    response = client.post(f"/settings/ai/keys/{item.id}/test", follow_redirects=True)
+    [item] = state.providers(conn)
+    response = client.post(f"/settings/ai/providers/{item.id}/test", follow_redirects=True)
     assert "DeepSeek rejected this key." in response.text
     assert db.settings.get(conn, "ai_status") == "Problem: DeepSeek rejected this key."
 
@@ -870,53 +879,52 @@ def test_sources_import_refuses_a_file_without_feeds(client):
 
 @pytest.fixture
 def local_server(monkeypatch):
-    """Ollama answers with two models; tests stand in for the network."""
     from newscout.ai import local
 
     def check(url, model):
         if url != "http://localhost:11434/v1":
-            return KeyCheck(False, f"Nothing answered at {url}.")
+            return Check(False, f"Nothing answered at {url}.")
         if model not in ("llama3.1", "qwen2.5"):
-            return KeyCheck(False, f"{model} is not on that server. It has: llama3.1, qwen2.5.")
-        return KeyCheck(True, f"{model} is ready.")
+            return Check(False, f"{model} is not on that server. It has: llama3.1, qwen2.5.")
+        return Check(True, f"{model} is ready.")
 
     monkeypatch.setattr(local, "check_model", check)
 
 
 def test_a_local_model_is_added_to_the_same_list_as_keys(client, conn, local_server):
-    client.post("/settings/ai/keys", data={"api_key": "sk-first111"})
+    client.post("/settings/ai/providers", data={"api_key": "sk-first111"})
     page = client.get("/settings?tab=ai").text
     assert "Ollama" in page and "LM Studio" in page and 'value="localhost:11434"' in page
 
     data = {"kind": "local", "url": "localhost:11434", "model": "qwen2.5"}
-    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    response = client.post("/settings/ai/providers", data=data, follow_redirects=True)
     assert "qwen2.5 is ready. It is now the model in use." in response.text
-    deepseek, model = state.keys(conn)
+    deepseek, model = state.providers(conn)
     assert model.active and model.local and model.url == "http://localhost:11434/v1"
-    assert state.key(conn) is None and state.judge(conn).model == "qwen2.5"
+    assert key_in_use(conn) is None and state.judge(conn).model == "qwen2.5"
     control = client.get("/control").text
     assert "qwen2.5" in control and "localhost:11434" in control
 
-    response = client.post(f"/settings/ai/keys/{deepseek.id}/use", follow_redirects=True)
-    assert "Switched." in response.text and state.key(conn) == "sk-first111"
-    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    response = client.post(f"/settings/ai/providers/{deepseek.id}/use", follow_redirects=True)
+    assert "Switched." in response.text and key_in_use(conn) == "sk-first111"
+    response = client.post("/settings/ai/providers", data=data, follow_redirects=True)
     assert "This model is already added." in response.text
 
 
 def test_a_local_model_that_cannot_answer_is_not_added(client, conn, local_server):
     data = {"kind": "local", "url": "localhost:1234", "model": "qwen2.5"}
-    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    response = client.post("/settings/ai/providers", data=data, follow_redirects=True)
     assert "Nothing answered at http://localhost:1234/v1." in response.text
     data = {"kind": "local", "url": "localhost:11434", "model": "mistral"}
-    response = client.post("/settings/ai/keys", data=data, follow_redirects=True)
+    response = client.post("/settings/ai/providers", data=data, follow_redirects=True)
     assert "mistral is not on that server. It has: llama3.1, qwen2.5." in response.text
-    assert state.keys(conn) == [] and state.judge(conn) is None
+    assert state.providers(conn) == [] and state.judge(conn) is None
 
 
 def test_with_nothing_added_the_add_form_is_open(client, conn):
     page = client.get("/settings?tab=ai").text
     assert 'id="add-key" checked' in page and 'class="add-group"' not in page
     assert 'title="Cancel"' not in page
-    client.post("/settings/ai/keys", data={"api_key": "sk-first111"})
+    client.post("/settings/ai/providers", data={"api_key": "sk-first111"})
     page = client.get("/settings?tab=ai").text
     assert 'id="add-key">' in page and 'class="add-group"' in page

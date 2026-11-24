@@ -20,21 +20,21 @@
 
 {% elif tab == 'ai' %}
 <section class="card settings">
-  <input class="toggle" type="checkbox" id="add-key"{{ ' checked' if not api_keys }}>
+  <input class="toggle" type="checkbox" id="add-key"{{ ' checked' if not providers }}>
   <h2 class="settings-section">{{ icon('key') }}Provider</h2>
-  {% if api_keys %}
+  {% if providers %}
   <div class="key-box">
-    {% for item in api_keys %}
-    {% set key_state = ('ok' if key_tested else 'problem' if ai_problem else 'unknown') if item.active else 'idle' %}
+    {% for item in providers %}
+    {% set key_state = ai_health if item.active else 'idle' %}
     <div class="key-item">
       <input class="toggle" type="checkbox" id="key-details-{{ item.id }}">
       <div class="key-status {{ key_state }}">
         <span class="key-icon">{% if key_state == 'problem' %}<svg viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>{% elif item.active %}<svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg>{% else %}{{ icon('database' if item.local else 'key') }}{% endif %}</span>
-        <span class="key-text"><b>{{ item.name }} <code class="key-hint">{{ '…' if not item.local }}{{ item.hint }}</code>{% if item.active %}<span class="state">{{ {'ok': 'Active', 'problem': 'Not Working', 'unknown': 'Not Tested'}[key_state] }}</span>{% endif %}</b></span>
-        {% if item.active %}{% if api_keys | length > 1 %}<span class="ghost spacer" aria-hidden="true">Use</span>{% endif %}{% else %}<form method="post" action="{{ url_for('settings.use_key', key_id=item.id) }}"><button class="ghost" type="submit" data-busy="Checking…">Use</button></form>{% endif %}
+        <span class="key-text"><b>{{ item.name }} <code class="key-hint">{{ item.hint }}</code>{% if item.active %}<span class="state">{{ key_state | health_label }}</span>{% endif %}</b></span>
+        {% if item.active %}{% if providers | length > 1 %}<span class="ghost spacer" aria-hidden="true">Use</span>{% endif %}{% else %}<form method="post" action="{{ url_for('settings.use_provider', provider_id=item.id) }}"><button class="ghost" type="submit" data-busy="Checking…">Use</button></form>{% endif %}
         <label class="ghost" for="key-details-{{ item.id }}">Details</label>
-        <form method="post" action="{{ url_for('settings.test_key', key_id=item.id) }}"><button class="ghost" type="submit" data-busy="Testing…">Test</button></form>
-        <form method="post" action="{{ url_for('settings.delete_key', key_id=item.id) }}" onsubmit="return confirm('Remove {{ item.name }} ({{ item.hint }})?')"><button class="ghost icon-only" type="submit" title="Remove" aria-label="Remove">{{ icon('trash') }}</button></form>
+        <form method="post" action="{{ url_for('settings.test_provider', provider_id=item.id) }}"><button class="ghost" type="submit" data-busy="Testing…">Test</button></form>
+        <form method="post" action="{{ url_for('settings.delete_provider', provider_id=item.id) }}" onsubmit="return confirm('Remove {{ item.name }} ({{ item.hint }})?')"><button class="ghost icon-only" type="submit" title="Remove" aria-label="Remove">{{ icon('trash') }}</button></form>
       </div>
       <p class="key-details">Added on {{ item.added_at }}, {% if not item.active %}not in use.{% elif key_state == 'ok' %}in use and working.{% elif key_state == 'problem' %}in use but not working.{% else %}in use but not tested yet.{% endif %}</p>
     </div>
@@ -49,18 +49,18 @@
       <label class="chip-option" for="add-deepseek">{{ icon('key') }}DeepSeek</label>
       {% for name in servers %}<label class="chip-option" for="add-{{ loop.index }}">{{ icon('database') }}{{ name }}</label>{% endfor %}
     </div>
-    <form class="key-field add-form add-deepseek" method="post" action="{{ url_for('settings.add_key') }}">
+    <form class="key-field add-form add-deepseek" method="post" action="{{ url_for('settings.add_provider') }}">
       <input name="api_key" type="password" autocomplete="off" placeholder="sk-…" aria-label="DeepSeek API key">
       <button class="save" type="submit" data-busy="Checking…">Add</button>
-      {% if api_keys %}<label class="ghost icon-only" for="add-key" title="Cancel" aria-label="Cancel">{{ icon('close') }}</label>{% endif %}
+      {% if providers %}<label class="ghost icon-only" for="add-key" title="Cancel" aria-label="Cancel">{{ icon('close') }}</label>{% endif %}
     </form>
     {% for name, address in servers.items() %}
-    <form class="key-field add-form add-{{ loop.index }}" method="post" action="{{ url_for('settings.add_key') }}">
+    <form class="key-field add-form add-{{ loop.index }}" method="post" action="{{ url_for('settings.add_provider') }}">
       <input type="hidden" name="kind" value="local">
       <input class="server" name="url" value="{{ address | replace('http://', '') | replace('/v1', '') }}" autocomplete="off" aria-label="{{ name }} address">
       <input name="model" autocomplete="off" placeholder="{{ suggested[name] }}" aria-label="Model">
       <button class="save" type="submit" data-busy="Checking…">Add</button>
-      {% if api_keys %}<label class="ghost icon-only" for="add-key" title="Cancel" aria-label="Cancel">{{ icon('close') }}</label>{% endif %}
+      {% if providers %}<label class="ghost icon-only" for="add-key" title="Cancel" aria-label="Cancel">{{ icon('close') }}</label>{% endif %}
     </form>
     {% endfor %}
   </div>

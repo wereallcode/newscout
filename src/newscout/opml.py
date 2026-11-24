@@ -1,9 +1,3 @@
-"""Moves sources in and out as OPML, the file every feed reader can read and write.
-
-Each group is a folder of feeds. A group's AI Filter rides along in a
-newscout:filter attribute that other readers ignore.
-"""
-
 import sqlite3
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -26,7 +20,7 @@ class NotOpml(Exception):
 class Folder:
     name: str
     filter: str = ""
-    feeds: dict[str, str] = field(default_factory=dict)  # url -> name
+    feeds: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -58,7 +52,6 @@ def export(groups: list[Group]) -> str:
 
 
 def _feeds(outline: ET.Element) -> dict[str, str]:
-    """Every feed under an outline, folders inside it flattened into it."""
     feeds = {}
     for item in outline.iter("outline"):
         url = (item.get("xmlUrl") or "").strip()
@@ -92,8 +85,6 @@ def parse(data: bytes) -> list[Folder]:
     return found
 
 
-# A new group comes in switched off, like a preset, so nothing is fetched until you
-# switch it on. Feeds you already have are skipped wherever they are.
 def load(conn: sqlite3.Connection, data: bytes) -> Imported:
     result = Imported()
     folders = parse(data)

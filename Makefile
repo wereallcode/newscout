@@ -15,6 +15,5 @@ format:
 
 check: lint test
 
-# Deletes every source, news item and setting.
 reset:
 	rm -rf data
