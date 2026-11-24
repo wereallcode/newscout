@@ -24,10 +24,14 @@
   {% set failing = group.sources | selectattr('status', 'equalto', 'error') | list | length %}
   <summary class="group-head">
     <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
-    <b>{{ group.name }}</b>
-    <span>{{ group.sources | length }} {{ 'source' if group.sources | length == 1 else 'sources' }}</span>
-    {% if failing %}<span class="group-badge error" title="Sources that failed on the last check">{{ failing }} failing</span>{% endif %}
-    {% if paused %}<span class="group-badge" title="Sources you paused">{{ paused }} paused</span>{% endif %}
+    <span class="group-title">
+      <b>{{ group.name }}</b>
+      <span class="group-meta">
+        <span>{{ group.sources | length }} {{ 'source' if group.sources | length == 1 else 'sources' }}</span>
+        {% if failing %}<span class="group-badge error" title="Sources that failed on the last check">{{ failing }} failing</span>{% endif %}
+        {% if paused %}<span class="group-badge" title="Sources you paused">{{ paused }} paused</span>{% endif %}
+      </span>
+    </span>
     <a class="group-edit-toggle group-export" href="{{ url_for('sources.export_group', group_id=group.id) }}" title="Export {{ group.name }} as OPML" aria-label="Export {{ group.name }} as OPML">{{ icon('download') }}</a>
     <label class="group-edit-toggle" for="edit-group-{{ group.id }}" title="Edit name and AI filter" aria-label="Edit {{ group.name }}">{{ icon('pencil') }}</label>
   </summary>
