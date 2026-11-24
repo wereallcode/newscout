@@ -375,7 +375,9 @@ def test_failing_sources_are_not_counted_as_working(client, conn):
 def test_retry_makes_a_failing_source_due_again(client, conn):
     source = db.sources.add(conn, "https://bad.example/feed")
     db.sources.record_failure(conn, source, NOW, NOW + timedelta(hours=6), "down")
-    assert "Retry" in client.get("/sources").text
+    page = client.get("/sources").text
+    assert "Check again now" in page
+    assert "1 failing" in page
     client.post(f"/sources/{source}/retry")
     assert [s.id for s in db.sources.due(conn, NOW)] == [source]
     assert client.post("/sources/999/retry").status_code == 404
@@ -808,3 +810,48 @@ def test_control_room_ai_card_summarises_the_ai_settings(client, conn):
     page = client.get("/control").text
     assert "…1234" in page and "Not tested" in page
     assert ">Turkish<" in page and ">Custom<" in page
+
+
+def test_sources_show_the_site_and_paused_count(client, conn):
+    source = db.sources.add(conn, "https://www.example.com/news/rss.xml")
+    db.sources.set_enabled(conn, source, False)
+    page = client.get("/sources").text
+    assert ">example.com</a>" in page
+    assert 'title="https://www.example.com/news/rss.xml"' in page
+    assert "1 paused" in page
+
+
+def test_a_group_exports_as_its_own_opml_download(client, conn):
+    news = db.groups.add(conn, "World News")
+    db.sources.add(conn, "https://example.com/feed", name="Example", group_id=news)
+    db.sources.add(conn, "https://other.example/feed", group_id=db.groups.add(conn, "Other"))
+    response = client.get(f"/groups/{news}/export")
+    assert "filename=world-news.opml" in response.headers["Content-Disposition"]
+    assert 'xmlUrl="https://example.com/feed"' in response.text
+    assert "other.example" not in response.text
+
+
+def test_sources_import_an_opml_upload(client, conn):
+    from io import BytesIO
+
+    data = b'<opml version="2.0"><body><outline text="Tech"><outline xmlUrl="https://example.com/feed"/></outline></body></opml>'
+    response = client.post(
+        "/sources/import",
+        data={"file": (BytesIO(data), "feeds.opml")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert "Imported 1 source into 1 new group" in response.text
+    assert [s.url for s in db.sources.list_all(conn)] == ["https://example.com/feed"]
+
+
+def test_sources_import_refuses_a_file_without_feeds(client):
+    from io import BytesIO
+
+    response = client.post(
+        "/sources/import",
+        data={"file": (BytesIO(b"hello"), "notes.txt")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert "That file has no feeds in it" in response.text

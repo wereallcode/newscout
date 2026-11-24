@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlparse
 
 STATUS_LABELS = {"running": "Running", "stopped": "Paused", "not responding": "Not working"}
 SOURCE_LABELS = {"ok": "Working", "error": "Problem", "pending": "Waiting"}
@@ -28,6 +29,12 @@ def ago_or_in(value: datetime | None) -> str:
     if value is None or value - now < timedelta(minutes=1):
         return "now"
     return "in " + ago(now - (value - now))
+
+
+def host(url: str) -> str:
+    """The site a feed lives on, without the www., so a long feed URL reads at a glance."""
+    name = urlparse(url).hostname or url
+    return name.removeprefix("www.")
 
 
 def hue(source_id: int) -> int:

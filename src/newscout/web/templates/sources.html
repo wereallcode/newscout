@@ -2,37 +2,48 @@
 {% block title %}Sources{% endblock %}
 {% from "_macros.html" import avatar, icon %}
 {% block content %}
-<div class="page-head"><h1>Sources</h1></div>
+<div class="page-head sources-head"><h1>Sources</h1></div>
 <form class="add" method="post" action="{{ url_for('sources.add') }}">
-  <input name="url" type="url" placeholder="Paste a news feed link, like https://example.com/feed" required autofocus aria-label="News feed link">
+  <input name="url" type="url" placeholder="Paste a news feed link." required autofocus aria-label="News feed link">
   {% if groups %}<select name="group_id" aria-label="Group">{% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}</select>{% endif %}
-  <button type="submit"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add source</button>
+  <button type="submit"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add Source</button>
 </form>
-<div class="group-tools">
-  <form class="new-group" method="post" action="{{ url_for('sources.add_group') }}">
-    <input name="name" required maxlength="40" placeholder="New group name" aria-label="New group name">
-    <button class="ghost" type="submit">{{ icon('plus') }}Create group</button>
-  </form>
-</div>
+<section class="card groups">
+<input class="toggle" type="checkbox" id="new-group">
+<h2 class="settings-section">{{ icon('layers') }}Groups
+  <span class="section-tools">
+    <form method="post" action="{{ url_for('sources.import_') }}" enctype="multipart/form-data">
+      <label class="section-add" title="Import an OPML file" aria-label="Import an OPML file">{{ icon('upload') }}<input class="toggle" type="file" name="file" accept=".opml,.xml,text/xml,text/x-opml" onchange="this.form.submit()"></label>
+    </form>
+  </span>
+</h2>
+
 
 {% for group in groups %}
-<details class="card group" data-group="{{ group.id }}">
+<details class="group" data-group="{{ group.id }}">
+  {% set paused = group.sources | rejectattr('enabled') | list | length %}
+  {% set failing = group.sources | selectattr('status', 'equalto', 'error') | list | length %}
   <summary class="group-head">
     <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
     <b>{{ group.name }}</b>
     <span>{{ group.sources | length }} {{ 'source' if group.sources | length == 1 else 'sources' }}</span>
+    {% if failing %}<span class="group-badge error" title="Sources that failed on the last check">{{ failing }} failing</span>{% endif %}
+    {% if paused %}<span class="group-badge" title="Sources you paused">{{ paused }} paused</span>{% endif %}
+    <a class="group-edit-toggle group-export" href="{{ url_for('sources.export_group', group_id=group.id) }}" title="Export {{ group.name }} as OPML" aria-label="Export {{ group.name }} as OPML">{{ icon('download') }}</a>
+    <label class="group-edit-toggle" for="edit-group-{{ group.id }}" title="Edit name and AI filter" aria-label="Edit {{ group.name }}">{{ icon('pencil') }}</label>
   </summary>
-  <details class="group-edit-box">
-    <summary><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>Edit name and AI relevance</summary>
-    <form class="group-edit" method="post" action="{{ url_for('sources.update_group', group_id=group.id) }}">
-      <label>Name<input name="name" required maxlength="40" value="{{ group.name }}"></label>
-      <label>AI relevance: which news from this group belongs in your Newsroom<textarea name="relevance" rows="3">{{ group.relevance or relevance_default }}</textarea></label>
-      <div class="panel-foot">
-        <button class="danger-button" type="submit" formaction="{{ url_for('sources.delete_group', group_id=group.id) }}" onclick="return confirm('Delete {{ group.name }} with its {{ group.sources | length }} sources and all their news?')">Delete group</button>
+  <input class="toggle" type="checkbox" id="edit-group-{{ group.id }}">
+  <form class="group-edit" method="post" action="{{ url_for('sources.update_group', group_id=group.id) }}">
+    <label>Name<input name="name" required maxlength="40" value="{{ group.name }}"></label>
+    <label><span>AI Filter<small>News that doesn't fit stays out of the Newsroom.</small></span><textarea name="relevance" rows="3">{{ group.relevance or relevance_default }}</textarea></label>
+    <div class="panel-foot">
+      <button class="danger-button" type="submit" formaction="{{ url_for('sources.delete_group', group_id=group.id) }}" onclick="return confirm('Delete {{ group.name }} with its {{ group.sources | length }} sources and all their news?')">Delete</button>
+      <span class="panel-actions">
         <button class="save" type="submit">Save</button>
-      </div>
-    </form>
-  </details>
+        <label class="ghost icon-only" for="edit-group-{{ group.id }}" title="Close" aria-label="Close">{{ icon('close') }}</label>
+      </span>
+    </div>
+  </form>
   {% if group.sources %}
   <ul class="source-list">
     {% for source in group.sources %}
@@ -40,11 +51,11 @@
       {{ avatar(source.id, source.name) }}
       <div class="info">
         <p class="name">{{ source.name }} <span class="dot {{ source.status }}" title="{{ source.last_error or (source.status | source_label) }}"></span></p>
-        <p class="meta"><span class="url">{{ source.url }}</span><span class="when" title="Last checked">{{ icon('clock') }}{{ source.last_checked_at | ago }}</span></p>
+        <p class="meta"><a class="url" href="{{ source.url }}" title="{{ source.url }}" target="_blank" rel="noopener">{{ source.url | host }}</a><span class="when" title="Last checked">{{ icon('clock') }}{{ source.last_checked_at | ago }}</span></p>
       </div>
       {% if source.status == 'error' %}
       <form method="post" action="{{ url_for('sources.retry', source_id=source.id) }}">
-        <button class="chip-button" type="submit" title="Check this source again now"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>Retry</button>
+        <button class="icon" type="submit" title="Check again now" aria-label="Check again now">{{ icon('refresh') }}</button>
       </form>
       {% endif %}
       <form method="post" action="{{ url_for('sources.toggle', source_id=source.id) }}">
@@ -67,5 +78,12 @@
 {% else %}
 <div class="empty"><p>No sources yet</p><span>Paste a news feed link above to start.</span></div>
 {% endfor %}
+<label class="add-group" for="new-group">{{ icon('plus') }}<span>Add</span></label>
+<form class="key-field new-group" method="post" action="{{ url_for('sources.add_group') }}">
+  <input name="name" required maxlength="40" placeholder="Group Name" aria-label="Group name">
+  <button class="save" type="submit">Create</button>
+  <label class="ghost icon-only" for="new-group" title="Cancel" aria-label="Cancel">{{ icon('close') }}</label>
+</form>
+</section>
 <script src="{{ url_for('static', filename='groups.js') }}" defer></script>
 {% endblock %}

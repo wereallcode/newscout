@@ -21,10 +21,12 @@ def create_app(path: Path | None = None) -> Flask:
     app = Flask(__name__)
     app.secret_key = os.environ.get("NEWSCOUT_SECRET") or secrets.token_hex(16)
     app.config["DATABASE"] = path or db.default_path()
+    app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024  # an OPML upload is the largest request
     app.jinja_env.filters.update(
         ago=display.ago,
         when=display.ago_or_in,
         hue=display.hue,
+        host=display.host,
         status_label=display.STATUS_LABELS.get,
         source_label=display.SOURCE_LABELS.get,
     )

@@ -1,8 +1,9 @@
+import re
 from urllib.parse import urlparse
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
 
-from newscout import db
+from newscout import db, opml
 from newscout.ai.instructions import RELEVANCE
 from newscout.web.database import conn
 
@@ -110,4 +111,40 @@ def delete_group(group_id: int):
     group = group_found(group_id)
     db.groups.delete(conn(), group_id)
     flash(f"{group.name} and its sources deleted.", "ok")
+    return back()
+
+
+def count(number: int, noun: str) -> str:
+    return f"{number} {noun}{'' if number == 1 else 's'}"
+
+
+@bp.get("/groups/<int:group_id>/export")
+def export_group(group_id: int):
+    group = group_found(group_id)
+    filename = re.sub(r"[^a-z0-9]+", "-", group.name.lower()).strip("-") or "group"
+    return Response(
+        opml.export([group]),
+        mimetype="text/x-opml",
+        headers={"Content-Disposition": f"attachment; filename={filename}.opml"},
+    )
+
+
+@bp.post("/sources/import")
+def import_():
+    upload = request.files.get("file")
+    try:
+        result = opml.load(conn(), upload.read() if upload else b"")
+    except opml.NotOpml:
+        flash("That file has no feeds in it. Pick an OPML file exported from a feed reader.")
+        return back()
+    if not result.sources:
+        flash("Every feed in that file is already in your sources.", "ok")
+        return back()
+    message = f"Imported {count(result.sources, 'source')}"
+    if result.groups:
+        message += f" into {count(result.groups, 'new group')}, switched off."
+        message += " Switch them on in Control Room to start fetching"
+    if result.skipped:
+        message += f". Skipped {result.skipped} you already had"
+    flash(message + ".", "ok")
     return back()
