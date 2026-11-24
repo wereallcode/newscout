@@ -18,11 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
+      # Caches uv downloads on pushes and pull requests (the default "auto").
+      - uses: astral-sh/setup-uv@v10.4.0
 
       # Fails when uv.lock is out of date with pyproject.toml.
       - name: Install
